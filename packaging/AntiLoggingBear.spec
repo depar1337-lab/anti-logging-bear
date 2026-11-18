@@ -1,6 +1,8 @@
 # Anti-Logging Bear by Priest
 # -*- mode: python ; coding: utf-8 -*-
 
+import os
+import re
 import sys
 from pathlib import Path
 
@@ -9,6 +11,7 @@ from PyInstaller.utils.hooks import collect_data_files
 ROOT = Path(SPECPATH).parent
 PKG = ROOT / "src" / "antiloggingbear"
 IS_MAC = sys.platform == "darwin"
+VERSION = re.search(r'__version__ = "(.+)"', (PKG / "__init__.py").read_text()).group(1)
 
 datas = [
     (str(PKG / "assets"), "antiloggingbear/assets"),
@@ -50,9 +53,9 @@ if IS_MAC:
         icon=str(PKG / "assets" / "app.icns"),
         bundle_identifier="com.priest.antiloggingbear",
         info_plist={
-            "CFBundleShortVersionString": "1.0.0",
+            "CFBundleShortVersionString": VERSION,
             "NSHighResolutionCapable": True,
-            "LSMinimumSystemVersion": "10.13",
+            "LSMinimumSystemVersion": os.environ.get("MACOSX_DEPLOYMENT_TARGET", "11.0"),
             "CFBundleDocumentTypes": [{
                 "CFBundleTypeName": "Download to check",
                 "CFBundleTypeRole": "Viewer",

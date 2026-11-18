@@ -37,24 +37,43 @@ jobs:
             dist/*-setup.exe
 
   macos:
-    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-latest
+            name: AppleSilicon
+            target: "11.0"
+          - runner: macos-15-intel
+            name: Intel
+            target: "10.15"
+    runs-on: ${{ matrix.runner }}
+    env:
+      MACOSX_DEPLOYMENT_TARGET: ${{ matrix.target }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: python -m pip install --upgrade pip
-      - run: pip install . yara-python pyinstaller
+      - run: pip install . pyinstaller
+      - run: pip install --no-binary yara-python yara-python
       - run: pyinstaller --noconfirm --distpath dist --workpath build packaging/AntiLoggingBear.spec
+      - name: Check minimum macOS
+        run: python packaging/macos_minimum.py "dist/Anti-Logging Bear.app" "$MACOSX_DEPLOYMENT_TARGET"
+      - name: Smoke test
+        run: |
+          echo hello > note.txt
+          "dist/Anti-Logging Bear.app/Contents/MacOS/Anti-Logging Bear" note.txt --no-av
       - name: Disk image
         run: |
           mkdir -p dmg
           cp -R "dist/Anti-Logging Bear.app" dmg/
           ln -s /Applications dmg/Applications
-          hdiutil create -volname "Anti-Logging Bear" -srcfolder dmg -ov -format UDZO "dist/AntiLoggingBear-macOS.dmg"
+          hdiutil create -volname "Anti-Logging Bear" -srcfolder dmg -ov -format UDZO "dist/AntiLoggingBear-macOS-${{ matrix.name }}.dmg"
       - uses: actions/upload-artifact@v4
         with:
-          name: macos
+          name: macos-${{ matrix.name }}
           path: dist/*.dmg
 
   release:
