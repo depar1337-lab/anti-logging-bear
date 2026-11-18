@@ -520,3 +520,8 @@ legend {
   .progress span { animation-duration: 3s; }
   * { transition: none !important; }
 }
+
+.desktop-app h2 { margin-bottom: 8px; }
+.desktop-app .actions { margin: 14px 0 0; }
+.desktop-app .button svg { width: 20px; height: 20px; }
+.desktop-app #desktop-note { margin: 12px 0 0; }

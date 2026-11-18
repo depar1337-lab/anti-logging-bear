@@ -5,6 +5,7 @@ const MAX_FILE_MB = 400;
 const HISTORY_LIMIT = 20;
 const SETTINGS_KEY = "alb.settings";
 const HISTORY_KEY = "alb.history";
+const RELEASES = "https://github.com/depar1337-lab/anti-logging-bear/releases/latest";
 
 const DEFAULTS = { strict: false, maxUnpackedMb: 512, highContrast: false, largeText: false, keepHistory: true };
 
@@ -352,6 +353,48 @@ function renderHistory() {
   }));
 }
 
+// Desktop app
+
+const DESKTOP = {
+  windows: {
+    label: "Download for Windows",
+    file: "AntiLoggingBear-x64-setup.exe",
+    note: "Windows 7 to 11. The app isn't code-signed yet, so Windows may say it protected your PC. Choose More info, then Run anyway.",
+  },
+  windows32: {
+    label: "Download for Windows (32-bit)",
+    file: "AntiLoggingBear-x86-setup.exe",
+    note: "Windows 7 to 11, 32-bit. The app isn't code-signed yet, so Windows may say it protected your PC. Choose More info, then Run anyway.",
+  },
+  mac: {
+    label: "Download for Mac",
+    file: "AntiLoggingBear-macOS.dmg",
+    note: "For Macs with Apple silicon (M1 or later). The app isn't notarised yet, so the first time, right-click it and choose Open.",
+  },
+};
+
+function desktopPlatform() {
+  const agent = navigator.userAgent;
+  const platform = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
+  if (/Android|iPhone|iPad|iPod/i.test(agent)) return null;
+  if (/Win/i.test(platform) || /Windows NT/.test(agent)) {
+    return /Win64|WOW64|x64|amd64|arm64/i.test(agent) || navigator.userAgentData ? "windows" : "windows32";
+  }
+  if (/Mac/i.test(platform) && navigator.maxTouchPoints < 2) return "mac";
+  return null;
+}
+
+function offerDesktopApp() {
+  $("about-downloads").href = RELEASES;
+  const build = DESKTOP[desktopPlatform()];
+  if (!build) return;
+  $("desktop-download").href = `${RELEASES}/download/${build.file}`;
+  $("desktop-download-label").textContent = build.label;
+  $("desktop-all").href = RELEASES;
+  $("desktop-note").textContent = build.note;
+  $("desktop-app").hidden = false;
+}
+
 // Settings
 
 function applyDisplay() {
@@ -470,5 +513,6 @@ bindSettings();
 bindFilePicking();
 bindResult();
 renderHistory();
+offerDesktopApp();
 startWorker();
 registerServiceWorker();

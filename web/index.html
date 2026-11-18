@@ -48,6 +48,19 @@
       <p class="engine-status" id="engine-status" role="status"></p>
     </div>
 
+    <section class="card desktop-app" id="desktop-app" aria-labelledby="desktop-title" hidden>
+      <h2 id="desktop-title">Get Barry for your computer</h2>
+      <p>The desktop app also checks new downloads automatically, asks your antivirus for a second opinion and runs Barry's YARA rules. It's free and doesn't need admin rights.</p>
+      <div class="actions">
+        <a class="button primary" id="desktop-download" href="#">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-download"></use></svg>
+          <span id="desktop-download-label">Download</span>
+        </a>
+        <a class="button" id="desktop-all" href="#" target="_blank" rel="noopener">All downloads</a>
+      </div>
+      <p class="muted small" id="desktop-note"></p>
+    </section>
+
     <section class="card" id="recent" aria-labelledby="recent-title" hidden>
       <div class="card-heading">
         <h2 id="recent-title">Recent checks</h2>
@@ -158,7 +171,7 @@
     <section class="about" id="about" aria-labelledby="about-title">
       <h3 id="about-title">About and privacy</h3>
       <p>Barry checks files with the same engine as the desktop app. The scan runs inside your browser, so your files never leave your device. The only time anything is sent is when you tap a <strong>VirusTotal</strong> link, which opens VirusTotal with a file's SHA-256 fingerprint.</p>
-      <p>The web version can't watch your downloads folder, and it doesn't include the antivirus second opinion or the YARA rules. The Windows and Mac apps have both.</p>
+      <p>The web version can't watch your downloads folder, and it doesn't include the antivirus second opinion or the YARA rules. The Windows and Mac apps have both. <a id="about-downloads" href="#" target="_blank" rel="noopener">Download them here</a>.</p>
       <p>No scanner can prove a file is safe. "No threats found" means Barry didn't spot anything suspicious.</p>
       <p class="muted small" id="about-version"></p>
     </section>
@@ -168,6 +181,7 @@
 <svg class="sprites" aria-hidden="true">
   <symbol id="i-gear" viewBox="0 0 24 24"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.5 7.5 0 0 0-1.7-1L15 3h-4l-.4 2.6a7.5 7.5 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.6 7.6 0 0 0 0 2l-2.2 1.6 2 3.5 2.5-1a7.5 7.5 0 0 0 1.7 1L11 21h4l.4-2.6a7.5 7.5 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M15 15l5.5 5.5" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3.5v11M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.5 19.5h15" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></symbol>
   <symbol id="v-clean" viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="currentColor"/><path d="M13.5 25l7 7 14-15" fill="none" stroke="var(--verdict-mark)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="v-suspicious" viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="currentColor"/><path d="M24 12v15" stroke="var(--verdict-mark)" stroke-width="5" stroke-linecap="round"/><circle cx="24" cy="35" r="3.2" fill="var(--verdict-mark)"/></symbol>
   <symbol id="v-dangerous" viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="currentColor"/><path d="M16 16l16 16M32 16L16 32" stroke="var(--verdict-mark)" stroke-width="5" stroke-linecap="round"/></symbol>
