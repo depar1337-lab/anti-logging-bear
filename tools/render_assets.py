@@ -45,6 +45,14 @@ def main() -> None:
             suffix = "" if scale == 1 else "@2x"
             image.save(OUT / f"barry-{pose}{suffix}.png", optimize=True)
 
+    WEB_IMAGES.mkdir(parents=True, exist_ok=True)
+    for pose in barry.WEB_POSES:
+        svg = barry.bear(pose)
+        (SRC / f"barry-{pose}.svg").write_text(svg, encoding="utf-8")
+        for scale in (1, 2):
+            suffix = "" if scale == 1 else "@2x"
+            render(svg, 210 * scale, 230 * scale).save(WEB_IMAGES / f"barry-{pose}{suffix}.png", optimize=True)
+
     head = barry.head_icon()
     (SRC / "barry-head.svg").write_text(head, encoding="utf-8")
     big = render(head, 512, 512)
@@ -66,7 +74,6 @@ def main() -> None:
     strip = barry.forest_strip()
     (SRC / "forest.svg").write_text(strip, encoding="utf-8")
     render(strip, 1200, 54).save(OUT / "forest.png", optimize=True)
-    WEB_IMAGES.mkdir(parents=True, exist_ok=True)
     render(barry.forest_strip(ground=DARK_GROUND), 1200, 54).save(WEB_IMAGES / "forest-dark.png", optimize=True)
     print("assets written to", OUT)
 

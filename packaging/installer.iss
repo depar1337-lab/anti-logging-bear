@@ -1,7 +1,7 @@
 ; Anti-Logging Bear by Priest
 
 #ifndef AppVersion
-  #define AppVersion "1.0.0"
+  #define AppVersion "1.0.1"
 #endif
 #ifndef Arch
   #define Arch "x64"

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.1
+
+- Mac app for Intel Macs (macOS 10.15 or later), alongside the Apple silicon build (macOS 11 or later)
+- Mac builds no longer need macOS 15 for YARA rules; each build is checked against its stated minimum macOS
+- The web app offers the right download when opened on a Windows PC or a Mac, and has a Downloads page
+- Web app redesign with square, classic-Windows style windows and buttons
+- Installer file names no longer include the version number
+
 ## 1.0.0
 
 First release.

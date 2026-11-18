@@ -18,7 +18,7 @@ const BLURB = {
 const SEVERITY_LABEL = { critical: "Critical", high: "High", medium: "Medium", low: "Low", info: "Info" };
 
 const $ = (id) => document.getElementById(id);
-const views = { idle: $("view-idle"), scanning: $("view-scanning"), result: $("view-result") };
+const views = { idle: $("view-idle"), scanning: $("view-scanning"), result: $("view-result"), downloads: $("view-downloads") };
 
 let settings = load(SETTINGS_KEY, DEFAULTS);
 let worker = null;
@@ -27,6 +27,8 @@ let engineVersion = "";
 let currentJob = null;
 let lastResult = null;
 let jobCounter = 0;
+let currentView = "idle";
+let viewBeforeDownloads = "idle";
 
 function load(key, fallback) {
   try {
@@ -212,7 +214,11 @@ function showError(name, message) {
 // Views
 
 function show(name, focusTarget) {
+  currentView = name;
   for (const [key, view] of Object.entries(views)) view.hidden = key !== name;
+  if (name === "downloads") $("open-downloads").setAttribute("aria-current", "page");
+  else $("open-downloads").removeAttribute("aria-current");
+  if (name !== "downloads" && location.hash === "#downloads") history.replaceState(null, "", location.pathname + location.search);
   window.scrollTo({ top: 0 });
   if (focusTarget) focusTarget.focus({ preventScroll: true });
 }
@@ -353,25 +359,27 @@ function renderHistory() {
   }));
 }
 
-// Desktop app
+// Downloads
 
-const DESKTOP = {
-  windows: {
-    label: "Download for Windows",
-    file: "AntiLoggingBear-x64-setup.exe",
-    note: "Windows 7 to 11. The app isn't code-signed yet, so Windows may say it protected your PC. Choose More info, then Run anyway.",
-  },
-  windows32: {
-    label: "Download for Windows (32-bit)",
-    file: "AntiLoggingBear-x86-setup.exe",
-    note: "Windows 7 to 11, 32-bit. The app isn't code-signed yet, so Windows may say it protected your PC. Choose More info, then Run anyway.",
-  },
-  mac: {
-    label: "Download for Mac",
-    file: "AntiLoggingBear-macOS.dmg",
-    note: "For Macs with Apple silicon (M1 or later). The app isn't notarised yet, so the first time, right-click it and choose Open.",
-  },
+const UNSIGNED_WINDOWS = "The app isn't code-signed yet, so Windows may say it protected your PC. Choose More info, then Run anyway.";
+const UNSIGNED_MAC = "The app isn't notarised yet, so the first time, right-click it and choose Open.";
+const MAC_CHIP = "Not sure which Mac you have? Open Apple menu > About This Mac. If it lists a Chip, it's Apple silicon. If it lists a Processor, it's Intel.";
+
+const BUILDS = {
+  windows: { label: "Download for Windows", name: "Windows installer", detail: "Windows 7 to 11, 64-bit. Most PCs.", file: "AntiLoggingBear-x64-setup.exe" },
+  windows32: { label: "Download for Windows (32-bit)", name: "Windows installer, 32-bit", detail: "Older 32-bit Windows 7 to 10.", file: "AntiLoggingBear-x86-setup.exe" },
+  portable: { name: "Portable zip", detail: "No installer. Unzip and run, 64-bit.", file: "AntiLoggingBear-x64-portable.zip" },
+  portable32: { name: "Portable zip, 32-bit", detail: "No installer, for 32-bit Windows.", file: "AntiLoggingBear-x86-portable.zip" },
+  macArm: { label: "Download for Mac", short: "Mac with Apple silicon", name: "Mac with Apple silicon", detail: "M1 or later, macOS 11 or newer.", file: "AntiLoggingBear-macOS-AppleSilicon.dmg" },
+  macIntel: { label: "Download for Intel Mac", short: "Intel Mac", name: "Intel Mac", detail: "macOS 10.15 or newer.", file: "AntiLoggingBear-macOS-Intel.dmg" },
 };
+
+const GROUPS = [
+  { title: "Windows", builds: ["windows", "windows32", "portable", "portable32"], note: UNSIGNED_WINDOWS },
+  { title: "Mac", builds: ["macArm", "macIntel"], note: `${MAC_CHIP} ${UNSIGNED_MAC}` },
+];
+
+let recommended = null;
 
 function desktopPlatform() {
   const agent = navigator.userAgent;
@@ -384,15 +392,160 @@ function desktopPlatform() {
   return null;
 }
 
-function offerDesktopApp() {
-  $("about-downloads").href = RELEASES;
-  const build = DESKTOP[desktopPlatform()];
-  if (!build) return;
-  $("desktop-download").href = `${RELEASES}/download/${build.file}`;
-  $("desktop-download-label").textContent = build.label;
-  $("desktop-all").href = RELEASES;
-  $("desktop-note").textContent = build.note;
+async function macArchitecture() {
+  try {
+    const hints = await navigator.userAgentData.getHighEntropyValues(["architecture"]);
+    if (hints.architecture === "x86") return "intel";
+    if (hints.architecture === "arm") return "arm";
+  } catch { /* Safari and Firefox don't say */ }
+  return "unknown";
+}
+
+const downloadUrl = (build) => `${RELEASES}/download/${build.file}`;
+
+async function offerDesktopApp() {
+  const platform = desktopPlatform();
+  if (!platform) return;
+  let note = `Windows 7 to 11. ${UNSIGNED_WINDOWS}`;
+  recommended = platform;
+  if (platform === "mac") {
+    const arch = await macArchitecture();
+    recommended = arch === "intel" ? "macIntel" : "macArm";
+    const other = arch === "intel" ? BUILDS.macArm : BUILDS.macIntel;
+    const alternate = $("desktop-alternate");
+    alternate.href = downloadUrl(other);
+    alternate.textContent = other.short;
+    alternate.hidden = false;
+    note = arch === "unknown"
+      ? `Needs macOS 11 or later (10.15 on Intel). ${MAC_CHIP} ${UNSIGNED_MAC}`
+      : `Needs macOS ${arch === "intel" ? "10.15" : "11"} or later. ${UNSIGNED_MAC}`;
+  }
+  const main = BUILDS[recommended];
+  $("desktop-download").href = downloadUrl(main);
+  $("desktop-download-label").textContent = main.label;
+  $("desktop-note").textContent = note;
   $("desktop-app").hidden = false;
+  renderDownloads();
+}
+
+function renderDownloads() {
+  $("downloads-releases").href = RELEASES.replace(/\/latest$/, "");
+  $("download-groups").replaceChildren(...GROUPS.map((group) => el("fieldset", { class: "group" },
+    el("legend", { text: group.title }),
+    el("ul", { class: "download-list" }, ...group.builds.map((key) => {
+      const build = BUILDS[key];
+      const best = key === recommended;
+      return el("li", { class: best ? "recommended" : "" },
+        el("span", { class: "name" }, build.name, best ? el("span", { class: "tag", text: "This device" }) : null),
+        el("span", { class: "detail", text: build.detail }),
+        el("a", { class: `button small${best ? " primary" : ""}`, href: downloadUrl(build), "aria-label": `Download ${build.name}` },
+          el("span", { text: "Download" })));
+    })),
+    el("p", { class: "note", text: group.note }))));
+}
+
+function route() {
+  if (location.hash === "#downloads") {
+    if (currentView !== "downloads") viewBeforeDownloads = currentView;
+    show("downloads", $("downloads-title"));
+  } else if (currentView === "downloads") {
+    const back = viewBeforeDownloads === "scanning" && !currentJob ? "idle" : viewBeforeDownloads;
+    show(back, back === "idle" ? $("choose-file") : null);
+  }
+}
+
+function bindDownloads() {
+  let pushed = false;
+  const open = () => {
+    if (location.hash === "#downloads") return;
+    pushed = true;
+    location.hash = "downloads";
+  };
+  $("open-downloads").addEventListener("click", open);
+  $("desktop-all").addEventListener("click", open);
+  $("about-downloads").addEventListener("click", (event) => {
+    event.preventDefault();
+    $("settings").close();
+    open();
+  });
+  $("downloads-back").addEventListener("click", () => {
+    if (pushed) {
+      pushed = false;
+      history.back();
+    } else {
+      history.replaceState(null, "", location.pathname + location.search);
+      route();
+    }
+  });
+  window.addEventListener("hashchange", route);
+  renderDownloads();
+  route();
+}
+
+// Barry's tummy
+
+const TUMMY = { x: 200 / 420, y: 362 / 460, rx: 64 / 420, ry: 68 / 460 };
+
+function onTummy(event, image) {
+  const box = image.getBoundingClientRect();
+  const x = ((event.clientX - box.left) / box.width - TUMMY.x) / TUMMY.rx;
+  const y = ((event.clientY - box.top) / box.height - TUMMY.y) / TUMMY.ry;
+  return x * x + y * y <= 1;
+}
+
+function bindTummy() {
+  const mood = (image, pose) => {
+    image.dataset.pose = pose;
+    image.src = `img/barry-${pose}.png`;
+    image.srcset = `img/barry-${pose}@2x.png 2x`;
+  };
+  const settle = (image) => {
+    image.classList.remove("queasy", "poked");
+    if (!image.dataset.pose) return;
+    image.src = image.dataset.src;
+    image.srcset = image.dataset.srcset;
+    delete image.dataset.pose;
+  };
+
+  for (const image of document.querySelectorAll(".barry")) {
+    let pokes = 0;
+    let calm = 0;
+    image.addEventListener("click", (event) => {
+      if (image.dataset.pose === "sick" || !onTummy(event, image)) return;
+      if (!image.dataset.pose) {
+        image.dataset.src = image.getAttribute("src");
+        image.dataset.srcset = image.getAttribute("srcset") || "";
+      }
+      if (pokes === 0) for (const pose of ["queasy", "sick"]) new Image().src = `img/barry-${pose}@2x.png`;
+      pokes += 1;
+      clearTimeout(calm);
+      image.classList.remove("poked");
+      void image.offsetWidth;
+      image.classList.add("poked");
+
+      if (pokes >= 9) {
+        pokes = 0;
+        image.classList.remove("queasy");
+        mood(image, "sick");
+        calm = setTimeout(() => settle(image), 4000);
+        return;
+      }
+      if (pokes >= 5) {
+        mood(image, "queasy");
+        image.classList.add("queasy");
+      }
+      calm = setTimeout(() => {
+        pokes = 0;
+        settle(image);
+      }, 2200);
+    });
+    new MutationObserver(() => {
+      if (image.dataset.pose && !image.getAttribute("src").includes(`barry-${image.dataset.pose}`)) {
+        image.classList.remove("queasy");
+        delete image.dataset.pose;
+      }
+    }).observe(image, { attributes: true, attributeFilter: ["src"] });
+  }
 }
 
 // Settings
@@ -498,7 +651,8 @@ function bindResult() {
   });
   document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape" || $("settings").open) return;
-    if (currentJob) cancelScan();
+    if (currentView === "downloads") $("downloads-back").click();
+    else if (currentJob) cancelScan();
     else if (!views.result.hidden) show("idle", $("choose-file"));
   });
 }
@@ -512,6 +666,8 @@ applyDisplay();
 bindSettings();
 bindFilePicking();
 bindResult();
+bindDownloads();
+bindTummy();
 renderHistory();
 offerDesktopApp();
 startWorker();

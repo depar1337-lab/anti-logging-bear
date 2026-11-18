@@ -70,7 +70,7 @@ Download a build from the [Releases page](https://github.com/depar1337-lab/anti-
 
 - **Windows 7 SP1 to Windows 11**: `AntiLoggingBear-x64-setup.exe`. Use the `x86` build on 32-bit Windows. Portable zips are also available. Windows 7 needs update KB2533623, which most patched systems already have.
 - **iPhone, iPad and Android**: no install needed, see [above](#iphone-ipad-and-android).
-- **macOS 11+ on Apple silicon (M1 or later)**: `AntiLoggingBear-macOS.dmg`. Intel Macs aren't supported yet. The app isn't notarised yet, so the first time you open it, right-click it and choose **Open**. To check a file from Finder, right-click it and choose **Open With > Anti-Logging Bear**.
+- **macOS**: `AntiLoggingBear-macOS-AppleSilicon.dmg` for M1 or later (macOS 11+), or `AntiLoggingBear-macOS-Intel.dmg` for Intel Macs (macOS 10.15+). About This Mac shows a **Chip** on Apple silicon and a **Processor** on Intel. On Apple silicon, dragging files onto the window needs macOS 14; on older versions use **Choose a file** or **Open With**. The app isn't notarised yet, so the first time you open it, right-click it and choose **Open**. To check a file from Finder, right-click it and choose **Open With > Anti-Logging Bear**.
 
 No administrator rights are needed. Barry installs per user, and every setting lives in your own profile.
 

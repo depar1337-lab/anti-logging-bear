@@ -22,13 +22,22 @@
 
 <header class="masthead">
   <div class="masthead-bar">
-    <div>
-      <h1>Anti-Logging Bear</h1>
-      <p class="tagline">Stop the loggers. Protect your forest of files.</p>
+    <div class="brand">
+      <img src="icons/favicon-32.png" width="32" height="32" alt="">
+      <div>
+        <h1>Anti-Logging Bear</h1>
+        <p class="tagline">Stop the loggers. Protect your forest of files.</p>
+      </div>
     </div>
-    <button type="button" class="icon-button" id="open-settings" aria-label="Settings" aria-haspopup="dialog">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-gear"></use></svg>
-    </button>
+    <nav class="toolbar" aria-label="App">
+      <button type="button" class="tool" id="open-downloads">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-download"></use></svg>
+        <span>Downloads</span>
+      </button>
+      <button type="button" class="tool icon-only" id="open-settings" aria-label="Settings" aria-haspopup="dialog">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-gear"></use></svg>
+      </button>
+    </nav>
   </div>
   <div class="trees" aria-hidden="true"></div>
 </header>
@@ -36,155 +45,193 @@
 <main id="main" tabindex="-1">
   <section id="view-idle" class="view" aria-labelledby="idle-title">
     <img class="barry" src="img/barry-idle.png" srcset="img/barry-idle@2x.png 2x" width="210" height="230" alt="">
-    <div class="card">
-      <h2 id="idle-title">Check a download before you open it</h2>
-      <p>Pick a zip, program, script, game mod or document. Barry reads it right here on your device. Nothing is uploaded and nothing is unzipped.</p>
-      <button type="button" class="button primary big" id="choose-file">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-search"></use></svg>
-        Choose a file
-      </button>
-      <input type="file" id="file-input" class="visually-hidden" tabindex="-1" aria-hidden="true">
-      <p class="hint pointer-only">or drop it anywhere on this page</p>
-      <p class="engine-status" id="engine-status" role="status"></p>
+    <div class="window">
+      <div class="title-bar"><h2 id="idle-title">Check a download</h2></div>
+      <div class="window-body">
+        <p>Pick a zip, program, script, game mod or document. Barry reads it right here on your device. Nothing is uploaded and nothing is unzipped.</p>
+        <button type="button" class="button primary big" id="choose-file">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-search"></use></svg>
+          Choose a file...
+        </button>
+        <input type="file" id="file-input" class="visually-hidden" tabindex="-1" aria-hidden="true">
+        <p class="hint pointer-only">or drop it anywhere on this page</p>
+        <p class="engine-status" id="engine-status" role="status"></p>
+      </div>
     </div>
 
-    <section class="card desktop-app" id="desktop-app" aria-labelledby="desktop-title" hidden>
-      <h2 id="desktop-title">Get Barry for your computer</h2>
-      <p>The desktop app also checks new downloads automatically, asks your antivirus for a second opinion and runs Barry's YARA rules. It's free and doesn't need admin rights.</p>
-      <div class="actions">
-        <a class="button primary" id="desktop-download" href="#">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-download"></use></svg>
-          <span id="desktop-download-label">Download</span>
-        </a>
-        <a class="button" id="desktop-all" href="#" target="_blank" rel="noopener">All downloads</a>
+    <section class="window" id="desktop-app" aria-labelledby="desktop-title" hidden>
+      <div class="title-bar"><h2 id="desktop-title">Get Barry for your computer</h2></div>
+      <div class="window-body">
+        <p>The desktop app also checks new downloads automatically, asks your antivirus for a second opinion and runs Barry's YARA rules. It's free and doesn't need admin rights.</p>
+        <div class="actions">
+          <a class="button primary" id="desktop-download" href="#">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-download"></use></svg>
+            <span id="desktop-download-label">Download</span>
+          </a>
+          <a class="button" id="desktop-alternate" href="#" hidden></a>
+          <button type="button" class="button" id="desktop-all">All downloads</button>
+        </div>
+        <p class="note" id="desktop-note"></p>
       </div>
-      <p class="muted small" id="desktop-note"></p>
     </section>
 
-    <section class="card" id="recent" aria-labelledby="recent-title" hidden>
-      <div class="card-heading">
-        <h2 id="recent-title">Recent checks</h2>
-        <button type="button" class="link-button" id="clear-recent">Clear</button>
+    <section class="window" id="recent" aria-labelledby="recent-title" hidden>
+      <div class="title-bar"><h2 id="recent-title">Recent checks</h2></div>
+      <div class="window-body">
+        <ul class="list-box recent-list" id="recent-list"></ul>
+        <div class="actions end"><button type="button" class="button small" id="clear-recent">Clear list</button></div>
       </div>
-      <ul class="recent-list" id="recent-list"></ul>
     </section>
   </section>
 
   <section id="view-scanning" class="view" aria-labelledby="scan-title" hidden>
     <img class="barry" src="img/barry-scan.png" srcset="img/barry-scan@2x.png 2x" width="210" height="230" alt="">
-    <div class="card">
-      <h2 id="scan-title" tabindex="-1">Barry is checking your file</h2>
-      <div class="progress" aria-hidden="true"><span></span></div>
-      <p class="scan-step" id="scan-step" aria-live="polite"></p>
-      <button type="button" class="button" id="cancel-scan">Cancel</button>
+    <div class="window">
+      <div class="title-bar"><span>Checking...</span></div>
+      <div class="window-body">
+        <h2 id="scan-title" tabindex="-1">Barry is checking your file</h2>
+        <div class="progress" aria-hidden="true"><span></span></div>
+        <p class="scan-step" id="scan-step" aria-live="polite"></p>
+        <div class="actions end"><button type="button" class="button" id="cancel-scan">Cancel</button></div>
+      </div>
     </div>
   </section>
 
   <section id="view-result" class="view" aria-labelledby="verdict-title" hidden>
     <img class="barry" id="result-barry" width="210" height="230" alt="">
-    <div class="card">
-      <div class="verdict" id="verdict">
-        <svg class="verdict-icon" viewBox="0 0 48 48" aria-hidden="true"><use id="verdict-icon" href="#v-clean"></use></svg>
-        <div>
-          <h2 id="verdict-title" tabindex="-1"></h2>
-          <p class="verdict-meta" id="verdict-meta"></p>
+    <div class="window">
+      <div class="title-bar"><span>Result</span></div>
+      <div class="window-body">
+        <div class="verdict" id="verdict">
+          <svg class="verdict-icon" viewBox="0 0 48 48" aria-hidden="true"><use id="verdict-icon" href="#v-clean"></use></svg>
+          <div>
+            <h2 id="verdict-title" tabindex="-1"></h2>
+            <p class="verdict-meta" id="verdict-meta"></p>
+          </div>
         </div>
-      </div>
-      <p id="verdict-blurb"></p>
-      <ul class="reasons" id="reasons"></ul>
-      <div class="actions">
-        <button type="button" class="button primary" id="check-another">Check another file</button>
-        <button type="button" class="button" id="save-report">Save report</button>
-        <button type="button" class="button" id="toggle-details" aria-expanded="false" aria-controls="details">Show details</button>
+        <p id="verdict-blurb"></p>
+        <ul class="reasons" id="reasons"></ul>
+        <div class="actions">
+          <button type="button" class="button primary" id="check-another">Check another file</button>
+          <button type="button" class="button" id="save-report">Save report</button>
+          <button type="button" class="button" id="toggle-details" aria-expanded="false" aria-controls="details">Show details</button>
+        </div>
       </div>
     </div>
 
     <div class="details" id="details" hidden>
-      <details class="card" open>
+      <details class="window" open>
         <summary>Findings <span class="badge" id="findings-count"></span></summary>
-        <ul class="findings" id="findings"></ul>
+        <div class="window-body"><ul class="findings" id="findings"></ul></div>
       </details>
-      <details class="card">
+      <details class="window">
         <summary>Files <span class="badge" id="files-count"></span></summary>
-        <p class="muted small">Tap <strong>VirusTotal</strong> to look a file up by its fingerprint. Only the fingerprint is sent, never the file.</p>
-        <ul class="files" id="files"></ul>
+        <div class="window-body">
+          <p class="note">Tap <strong>VirusTotal</strong> to look a file up by its fingerprint. Only the fingerprint is sent, never the file.</p>
+          <ul class="files" id="files"></ul>
+        </div>
       </details>
-      <details class="card" id="addresses-card">
+      <details class="window" id="addresses-card">
         <summary>Web addresses found <span class="badge" id="addresses-count"></span></summary>
-        <ul class="addresses" id="addresses"></ul>
+        <div class="window-body"><ul class="list-box addresses" id="addresses"></ul></div>
       </details>
-      <details class="card">
+      <details class="window">
         <summary>Engines</summary>
-        <ul class="engines" id="engines"></ul>
+        <div class="window-body"><ul class="engines" id="engines"></ul></div>
       </details>
+    </div>
+  </section>
+
+  <section id="view-downloads" class="view" aria-labelledby="downloads-title" hidden>
+    <img class="barry" src="img/barry-happy.png" srcset="img/barry-happy@2x.png 2x" width="210" height="230" alt="">
+    <div class="window">
+      <div class="title-bar"><h2 id="downloads-title" tabindex="-1">Downloads</h2></div>
+      <div class="window-body">
+        <p>Barry is free everywhere. The Windows and Mac apps add automatic download checks, an antivirus second opinion and YARA rules. Nothing needs admin rights.</p>
+        <div id="download-groups"></div>
+        <fieldset class="group">
+          <legend>iPhone, iPad and Android</legend>
+          <p>Nothing to download. You're already using it. Open this page in Safari (or Chrome on Android), tap <strong>Share</strong>, then <strong>Add to Home Screen</strong>. Barry gets his own icon and works offline.</p>
+        </fieldset>
+        <p class="note">Older versions and release notes are on <a id="downloads-releases" href="#" target="_blank" rel="noopener">GitHub</a>.</p>
+        <div class="actions end"><button type="button" class="button" id="downloads-back">Back</button></div>
+      </div>
     </div>
   </section>
 </main>
 
-<footer class="foot">
-  <p>Everything runs on your device. <button type="button" class="link-button" id="open-about">About and privacy</button></p>
+<footer class="status-bar">
+  <p class="status-field grow">Everything runs on your device.</p>
+  <p class="status-field"><button type="button" class="link-button" id="open-about">About and privacy</button></p>
 </footer>
 
-<dialog id="settings" aria-labelledby="settings-title">
-  <form method="dialog" class="sheet">
-    <div class="sheet-heading">
+<dialog id="settings" class="window" aria-labelledby="settings-title">
+  <form method="dialog">
+    <div class="title-bar">
       <h2 id="settings-title">Settings</h2>
-      <button class="button primary small" value="close">Done</button>
+      <button class="title-close" value="close" aria-label="Close">
+        <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="2"/></svg>
+      </button>
     </div>
+    <div class="window-body sheet">
+      <fieldset class="group">
+        <legend>Detection</legend>
+        <label class="check">
+          <input type="checkbox" id="opt-strict">
+          <span><strong>Strict mode</strong><small>Medium-risk findings also make a file suspicious.</small></span>
+        </label>
+        <label class="field">
+          <span><strong>Unpacked size limit</strong><small>Barry stops reading a zip after this much data. Phones have less memory than computers.</small></span>
+          <select id="opt-limit">
+            <option value="256">256 MB</option>
+            <option value="512">512 MB</option>
+            <option value="1024">1 GB</option>
+          </select>
+        </label>
+      </fieldset>
 
-    <fieldset>
-      <legend>Detection</legend>
-      <label class="toggle">
-        <input type="checkbox" id="opt-strict" role="switch">
-        <span><strong>Strict mode</strong><small>Medium-risk findings also make a file suspicious.</small></span>
-      </label>
-      <label class="field">
-        <span><strong>Unpacked size limit</strong><small>Barry stops reading a zip after this much data. Phones have less memory than computers.</small></span>
-        <select id="opt-limit">
-          <option value="256">256 MB</option>
-          <option value="512">512 MB</option>
-          <option value="1024">1 GB</option>
-        </select>
-      </label>
-    </fieldset>
+      <fieldset class="group">
+        <legend>Display</legend>
+        <label class="check">
+          <input type="checkbox" id="opt-contrast">
+          <span><strong>High contrast</strong><small>Black background with bright text.</small></span>
+        </label>
+        <label class="check">
+          <input type="checkbox" id="opt-large">
+          <span><strong>Larger text</strong></span>
+        </label>
+      </fieldset>
 
-    <fieldset>
-      <legend>Display</legend>
-      <label class="toggle">
-        <input type="checkbox" id="opt-contrast" role="switch">
-        <span><strong>High contrast</strong><small>Black background with bright text.</small></span>
-      </label>
-      <label class="toggle">
-        <input type="checkbox" id="opt-large" role="switch">
-        <span><strong>Larger text</strong></span>
-      </label>
-    </fieldset>
+      <fieldset class="group">
+        <legend>History</legend>
+        <label class="check">
+          <input type="checkbox" id="opt-history">
+          <span><strong>Remember recent checks</strong><small>Kept only in this browser. File names and verdicts, never the files.</small></span>
+        </label>
+      </fieldset>
 
-    <fieldset>
-      <legend>History</legend>
-      <label class="toggle">
-        <input type="checkbox" id="opt-history" role="switch">
-        <span><strong>Remember recent checks</strong><small>Kept only in this browser. File names and verdicts, never the files.</small></span>
-      </label>
-    </fieldset>
+      <fieldset class="group about" id="about" aria-labelledby="about-title">
+        <legend id="about-title">About and privacy</legend>
+        <p>Barry checks files with the same engine as the desktop app. The scan runs inside your browser, so your files never leave your device. The only time anything is sent is when you tap a <strong>VirusTotal</strong> link, which opens VirusTotal with a file's SHA-256 fingerprint.</p>
+        <p>The web version can't watch your downloads folder, and it doesn't include the antivirus second opinion or the YARA rules. The Windows and Mac apps have both. <a id="about-downloads" href="#downloads">See downloads</a>.</p>
+        <p>No scanner can prove a file is safe. "No threats found" means Barry didn't spot anything suspicious.</p>
+        <p class="note" id="about-version"></p>
+      </fieldset>
 
-    <section class="about" id="about" aria-labelledby="about-title">
-      <h3 id="about-title">About and privacy</h3>
-      <p>Barry checks files with the same engine as the desktop app. The scan runs inside your browser, so your files never leave your device. The only time anything is sent is when you tap a <strong>VirusTotal</strong> link, which opens VirusTotal with a file's SHA-256 fingerprint.</p>
-      <p>The web version can't watch your downloads folder, and it doesn't include the antivirus second opinion or the YARA rules. The Windows and Mac apps have both. <a id="about-downloads" href="#" target="_blank" rel="noopener">Download them here</a>.</p>
-      <p>No scanner can prove a file is safe. "No threats found" means Barry didn't spot anything suspicious.</p>
-      <p class="muted small" id="about-version"></p>
-    </section>
+      <div class="actions end dialog-buttons">
+        <button class="button primary" value="close">OK</button>
+      </div>
+    </div>
   </form>
 </dialog>
 
 <svg class="sprites" aria-hidden="true">
   <symbol id="i-gear" viewBox="0 0 24 24"><path fill="currentColor" d="M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.5 7.5 0 0 0-1.7-1L15 3h-4l-.4 2.6a7.5 7.5 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.6 7.6 0 0 0 0 2l-2.2 1.6 2 3.5 2.5-1a7.5 7.5 0 0 0 1.7 1L11 21h4l.4-2.6a7.5 7.5 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" transform="translate(-1 0)"/></symbol>
-  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M15 15l5.5 5.5" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/></symbol>
-  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3.5v11M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.5 19.5h15" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6" fill="none" stroke="currentColor" stroke-width="2.5"/><path d="M15 15l5.5 5.5" stroke="currentColor" stroke-width="2.8" stroke-linecap="square"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3.5v11M7 10l5 5 5-5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square"/><path d="M4.5 19.5h15" stroke="currentColor" stroke-width="2.5"/></symbol>
   <symbol id="v-clean" viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="currentColor"/><path d="M13.5 25l7 7 14-15" fill="none" stroke="var(--verdict-mark)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-  <symbol id="v-suspicious" viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="currentColor"/><path d="M24 12v15" stroke="var(--verdict-mark)" stroke-width="5" stroke-linecap="round"/><circle cx="24" cy="35" r="3.2" fill="var(--verdict-mark)"/></symbol>
-  <symbol id="v-dangerous" viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="currentColor"/><path d="M16 16l16 16M32 16L16 32" stroke="var(--verdict-mark)" stroke-width="5" stroke-linecap="round"/></symbol>
+  <symbol id="v-suspicious" viewBox="0 0 48 48"><path d="M24 3L46 43H2z" fill="currentColor"/><path d="M24 17v13" stroke="var(--verdict-mark)" stroke-width="5"/><rect x="21.5" y="34" width="5" height="5" fill="var(--verdict-mark)"/></symbol>
+  <symbol id="v-dangerous" viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="currentColor"/><path d="M16 16l16 16M32 16L16 32" stroke="var(--verdict-mark)" stroke-width="5"/></symbol>
 </svg>
 </body>
 </html>

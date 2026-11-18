@@ -15,6 +15,9 @@ FEATHER = "#d63b2b"
 FEATHER_DARK = "#8f1f17"
 CHEEK = "#e88c6a"
 LEAF = "#4caf50"
+SICK = "#9cc23e"
+SICK_DARK = "#5f7f1c"
+SICK_LIGHT = "#cfe07a"
 
 W = f'stroke="{INK}" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"'
 
@@ -59,7 +62,18 @@ def _face(mood):
         f'<ellipse cx="166" cy="166" rx="14" ry="17" fill="#fff" {W}/>',
         f'<ellipse cx="234" cy="166" rx="14" ry="17" fill="#fff" {W}/>',
     ])
-    if mood == "happy":
+    if mood == "sick":
+        pupils = (f'<path d="M154 156 L178 166 L154 176" fill="none" stroke="{INK}" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>'
+                  f'<path d="M246 156 L222 166 L246 176" fill="none" stroke="{INK}" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>')
+        eyes = ""
+    elif mood == "queasy":
+        pupils = "".join([
+            f'<circle cx="166" cy="172" r="7" fill="{INK}"/>',
+            f'<circle cx="234" cy="172" r="7" fill="{INK}"/>',
+            f'<path d="M151 162 Q166 156 181 162" fill="{FUR}" stroke="{INK}" stroke-width="5" stroke-linecap="round"/>',
+            f'<path d="M219 162 Q234 156 249 162" fill="{FUR}" stroke="{INK}" stroke-width="5" stroke-linecap="round"/>',
+        ])
+    elif mood == "happy":
         pupils = (f'<path d="M154 168 Q166 152 178 168" fill="none" stroke="{INK}" stroke-width="7" stroke-linecap="round"/>'
                   f'<path d="M222 168 Q234 152 246 168" fill="none" stroke="{INK}" stroke-width="7" stroke-linecap="round"/>')
         eyes = ""
@@ -77,6 +91,8 @@ def _face(mood):
         "happy": "M150 136 Q165 126 180 134 M220 134 Q235 126 250 136",
         "worried": "M150 148 Q164 142 180 132 M220 132 Q236 142 250 148",
         "alarm": "M150 134 Q166 140 182 148 M218 148 Q234 140 250 134",
+        "queasy": "M150 146 Q164 140 180 136 M220 136 Q236 140 250 146",
+        "sick": "M150 136 Q166 144 182 150 M218 150 Q234 144 250 136",
     }[mood]
     mouth = {
         "idle": f'<path d="M184 220 Q200 236 216 220" fill="none" stroke="{INK}" stroke-width="6" stroke-linecap="round"/>',
@@ -85,12 +101,20 @@ def _face(mood):
                   f'<path d="M189 232 Q200 242 211 232 Q200 226 189 232 Z" fill="#e86a5a"/>'),
         "worried": f'<path d="M184 226 Q192 218 200 226 Q208 234 216 226" fill="none" stroke="{INK}" stroke-width="6" stroke-linecap="round"/>',
         "alarm": f'<ellipse cx="200" cy="228" rx="13" ry="15" fill="#7a2a20" {W}/>',
+        "queasy": (f'<path d="M180 228 Q188 218 196 228 Q204 238 212 228 Q218 220 222 226" fill="none" '
+                   f'stroke="{INK}" stroke-width="6" stroke-linecap="round"/>'),
+        "sick": f'<ellipse cx="200" cy="230" rx="20" ry="17" fill="#7a2a20" {W}/>',
     }[mood]
+    tint = ""
+    if mood in ("queasy", "sick"):
+        tint = (f'<ellipse cx="200" cy="208" rx="50" ry="38" fill="{SICK}" opacity="0.45"/>'
+                f'<ellipse cx="146" cy="204" rx="15" ry="10" fill="{SICK}" opacity="0.7"/>'
+                f'<ellipse cx="254" cy="204" rx="15" ry="10" fill="{SICK}" opacity="0.7"/>')
     return "".join([
         f'<ellipse cx="200" cy="208" rx="50" ry="38" fill="{MUZZLE}" {W}/>',
         f'<ellipse cx="146" cy="204" rx="14" ry="9" fill="{CHEEK}" opacity="0.5"/>',
         f'<ellipse cx="254" cy="204" rx="14" ry="9" fill="{CHEEK}" opacity="0.5"/>',
-        eyes, pupils,
+        tint, eyes, pupils,
         f'<path d="{brows}" fill="none" stroke="{INK}" stroke-width="7" stroke-linecap="round"/>',
         f'<path d="M184 190 Q200 180 216 190 Q214 204 200 207 Q186 204 184 190 Z" fill="{NOSE}"/>',
         '<ellipse cx="194" cy="189" rx="5" ry="3" fill="#fff" opacity="0.6"/>',
@@ -154,7 +178,32 @@ def _drop():
             f'C328 164 336 158 336 148 C336 136 318 112 318 112 Z" fill="#7cc4e8" {W}/>')
 
 
+def _wobble():
+    return "".join(
+        f'<path d="M{x} {y} q8 -10 16 0 t16 0" fill="none" stroke="{SICK_DARK}" stroke-width="5" stroke-linecap="round"/>'
+        for x, y in ((48, 150), (334, 168), (40, 196))
+    )
+
+
+def _vomit():
+    return "".join([
+        f'<path d="M184 236 C176 262 196 282 220 300 C252 324 270 356 268 392 C267 410 270 424 276 430 '
+        f'L330 430 C318 412 306 396 300 370 C292 330 262 296 236 270 C224 258 220 246 218 236 Z" fill="{SICK}" {W}/>',
+        f'<path d="M200 248 C206 270 236 292 256 318 C272 340 280 368 284 400" fill="none" stroke="{SICK_LIGHT}" '
+        f'stroke-width="7" stroke-linecap="round" opacity="0.8"/>',
+        f'<path d="M236 444 C226 428 252 418 290 420 C330 418 382 422 392 434 C398 448 356 452 300 452 '
+        f'C262 452 240 452 236 444 Z" fill="{SICK}" {W}/>',
+        f'<circle cx="262" cy="350" r="6" fill="{SICK_LIGHT}" stroke="{SICK_DARK}" stroke-width="3"/>',
+        f'<circle cx="236" cy="300" r="5" fill="#e3a23a" stroke="{SICK_DARK}" stroke-width="3"/>',
+        f'<circle cx="290" cy="396" r="5" fill="#e3a23a" stroke="{SICK_DARK}" stroke-width="3"/>',
+        f'<circle cx="340" cy="436" r="6" fill="{SICK_LIGHT}" stroke="{SICK_DARK}" stroke-width="3"/>',
+        f'<circle cx="372" cy="432" r="4" fill="#e3a23a" stroke="{SICK_DARK}" stroke-width="2"/>',
+        f'<path d="M354 408 q6 -8 12 0 M380 402 q6 -8 12 0" fill="none" stroke="{SICK_DARK}" stroke-width="4" stroke-linecap="round"/>',
+    ])
+
+
 POSES = ("idle", "scan", "happy", "worried", "alarm")
+WEB_POSES = ("queasy", "sick")
 
 
 def bear(pose: str) -> str:
@@ -171,6 +220,10 @@ def bear(pose: str) -> str:
     elif pose == "alarm":
         parts += [_body(), _limb(124, 300, 84, 350, paw=False), _limb(276, 300, 316, 350, paw=False), _sign(),
                   _paw(84, 352), _paw(316, 352), _head("alarm")]
+    elif pose == "queasy":
+        parts += [_body(), _limb(124, 300, 172, 352), _limb(276, 300, 228, 352), _head("queasy"), _wobble()]
+    elif pose == "sick":
+        parts += [_body(), _limb(124, 300, 172, 352), _limb(276, 300, 228, 352), _head("sick"), _vomit()]
     else:
         raise ValueError(pose)
     return _svg("0 0 420 460", "".join(parts))
