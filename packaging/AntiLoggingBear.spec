@@ -44,7 +44,7 @@ datas = [
     (str(PKG / "assets"), "antiloggingbear/assets"),
     (str(PKG / "rules"), "antiloggingbear/rules"),
 ]
-datas += [entry for entry in collect_data_files("tkinterdnd2") if tkdnd_wanted(entry[1])]
+datas += collect_data_files("tkinterdnd2")
 datas += collect_data_files("oletools", includes=["**/*.txt", "**/*.json"])
 
 hidden = ["pystray._win32"] if sys.platform == "win32" else []
@@ -58,6 +58,8 @@ a = Analysis(
               "PIL._avif", "PIL._webp", "PIL.ImageCms", "PIL.ImageQt", "PIL.ImageTk", "yaml", "pygments"],
     noarchive=False,
 )
+a.binaries = [entry for entry in a.binaries if tkdnd_wanted(entry[0])]
+a.datas = [entry for entry in a.datas if tkdnd_wanted(entry[0])]
 pyz = PYZ(a.pure)
 
 exe = EXE(

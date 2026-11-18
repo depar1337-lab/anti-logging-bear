@@ -60,18 +60,27 @@ def minimums(path):
     return slice_minimums(data, 0)
 
 
+def dotted(version):
+    return ".".join(map(str, version))
+
+
 def main():
     bundle, target = Path(sys.argv[1]), parse_version(sys.argv[2])
+    optional = sys.argv[3:]
     newest = (0, 0, 0)
     too_new = []
     for path in sorted(p for p in bundle.rglob("*") if p.is_file() and not p.is_symlink()):
+        relative = path.relative_to(bundle).as_posix()
         for version in minimums(path):
-            newest = max(newest, version)
-            if version > target:
-                too_new.append((path.relative_to(bundle), version))
-    print("newest macOS needed by any file: " + ".".join(map(str, newest)))
-    for path, version in too_new:
-        print("  needs " + ".".join(map(str, version)) + ": " + str(path))
+            if version <= target:
+                newest = max(newest, version)
+            elif any(marker in relative for marker in optional):
+                print("optional, needs " + dotted(version) + ": " + relative)
+            else:
+                too_new.append((relative, version))
+    print("newest macOS needed by the app: " + dotted(newest))
+    for relative, version in too_new:
+        print("  needs " + dotted(version) + ": " + relative)
     return 1 if too_new else 0
 
 

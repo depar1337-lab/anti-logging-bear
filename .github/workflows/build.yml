@@ -66,7 +66,7 @@ jobs:
           python -m pip install yara-wheel/*.whl
       - run: pyinstaller --noconfirm --distpath dist --workpath build packaging/AntiLoggingBear.spec
       - name: Check minimum macOS
-        run: python packaging/macos_minimum.py "dist/Anti-Logging Bear.app" "$MACOSX_DEPLOYMENT_TARGET"
+        run: python packaging/macos_minimum.py "dist/Anti-Logging Bear.app" "$MACOSX_DEPLOYMENT_TARGET" tkinterdnd2/
       - name: Smoke test
         run: |
           echo hello > note.txt
