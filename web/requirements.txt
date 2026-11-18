@@ -1,0 +1,7 @@
+pefile==2024.8.26
+olefile==0.47
+oletools==0.60.2
+pcodedmp==1.2.6
+LnkParse3==1.6.0
+pyparsing==3.2.3
+colorclass==2.2.2

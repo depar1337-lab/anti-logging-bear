@@ -1,0 +1,141 @@
+# Anti-Logging Bear
+
+**Stop the loggers. Protect your forest of files.**
+
+Anti-Logging Bear checks downloads for keyloggers, password stealers and other malware *before* you unzip or run them. Drop a zip on Barry and he reads every file inside it straight from the archive. Nothing gets extracted to disk and nothing runs.
+
+![Main window](docs/main-window.png)
+
+Built for the stuff people actually download: game mods (ASI plugins, MoonLoader and CLEO scripts), cheats and trainers, tools, scripts, and documents.
+
+## What Barry looks for
+
+| Area | Checks |
+|---|---|
+| **Archives** | Zip bombs, password-protected files, paths that escape the unzip folder, nested archives, fake extensions (`invoice.pdf.exe`), hidden right-to-left characters, archive formats he can't open |
+| **Programs** (`.exe` `.dll` `.asi` `.scr`) | Keyboard hooks and key polling, combined with webhook/Telegram/SMTP upload, keylogger log formatting (`[BACKSPACE]`), clipboard and screenshot capture, code injection and process hollowing, browser password and Discord token theft, start-up persistence, packers and encrypted code |
+| **Scripts and mods** (`.ps1` `.bat` `.vbs` `.js` `.hta` `.py` `.lua` `.cs`) | Download-and-run, encoded PowerShell (decoded and re-checked), obfuscation, antivirus tampering, Python/Lua/PowerShell keyloggers, SA-MP dialog password grabbing |
+| **Documents and shortcuts** | Auto-run Office macros, remote templates, DDE, PDF JavaScript and launch actions, `.lnk` shortcuts that secretly run PowerShell or `cmd` |
+| **Extra engines** | Bundled YARA rules, a second opinion from Microsoft Defender (or ClamAV on macOS), and optional VirusTotal hash lookups |
+
+Barry scores capabilities together rather than flagging single API calls. A mod that reads keys for hotkeys is fine. One that reads keys **and** posts to a Discord webhook is a keylogger.
+
+| Dangerous | Clean |
+|---|---|
+| ![Dangerous result](docs/dangerous.png) | ![Clean result](docs/clean.png) |
+
+## Automatic download checks
+
+Barry can watch your Downloads folder, or any folders you choose. Each new file is checked once the browser finishes writing it. If something looks wrong, a pop-up asks whether to **Quarantine**, **View report** or **Ignore**. Quarantined files are renamed so they can't be opened, and you can restore them from Settings.
+
+![Download alert](docs/download-alert.png)
+
+On Windows Barry runs from the system tray. On macOS he stays in the Dock.
+
+## iPhone, iPad and Android
+
+<img src="docs/web-phone.png" alt="Barry on a phone" width="280" align="right">
+
+Barry also runs as a web app, using the same engine as the desktop version compiled to WebAssembly. It's handy for checking a mod or tool you downloaded on your phone before you send it to your PC.
+
+1. Open **[depar1337-lab.github.io/anti-logging-bear](https://depar1337-lab.github.io/anti-logging-bear/)** in Safari (or Chrome on Android).
+2. Tap **Share > Add to Home Screen**. Barry gets his own icon and works offline after the first visit.
+3. Tap **Choose a file** and pick the download from the Files app. Downloads from Safari are in **Files > Downloads**.
+
+The scan happens inside the browser. Files are never uploaded. Each file in the details view has a **VirusTotal** link that looks it up by its SHA-256 fingerprint.
+
+The phone version can't watch your downloads, because iOS doesn't let apps do that. It also has no antivirus second opinion or YARA rules, and it checks files up to 400 MB.
+
+<br clear="right">
+
+## Simple by default, detailed when you want it
+
+The main view shows a verdict and plain-English reasons. **Show details** opens the full findings table, file fingerprints (SHA-256), extracted web addresses, engine status and scan history. Reports can be saved as HTML, JSON or text.
+
+![Details](docs/details.png)
+
+Settings cover watched folders and exclusions, strict mode, custom YARA rules, file-size limits, VirusTotal, start at login, the Explorer right-click entry, quarantine, high-contrast colours and larger text. Everything can be done from the keyboard:
+
+| Key | Action |
+|---|---|
+| Ctrl+O | Choose a file |
+| Ctrl+D | Show or hide details |
+| Ctrl+S | Save the report |
+| Ctrl+, | Settings |
+| Esc | Cancel or go back |
+
+## Install
+
+Download a build from the Releases page.
+
+- **Windows 7 SP1 to Windows 11**: `AntiLoggingBear-<version>-x64-setup.exe`. Use the `x86` build on 32-bit Windows. Portable zips are also available. Windows 7 needs update KB2533623, which most patched systems already have.
+- **iPhone, iPad and Android**: no install needed, see [above](#iphone-ipad-and-android).
+- **macOS 10.13+**: `AntiLoggingBear-macOS.dmg`. The app isn't notarised yet, so the first time you open it, right-click it and choose **Open**. To check a file from Finder, right-click it and choose **Open With > Anti-Logging Bear**.
+
+No administrator rights are needed. Barry installs per user, and every setting lives in your own profile.
+
+## Command line
+
+```
+antiloggingbear download.zip              # text report, exit code 0 clean / 1 suspicious / 2 dangerous
+antiloggingbear download.zip --json       # machine-readable
+antiloggingbear download.zip --html report.html -v
+antiloggingbear --gui download.zip        # open the window and check the file
+antiloggingbear --background              # start hidden and watch downloads
+```
+
+Run `antiloggingbear --help` for every option.
+
+## Privacy
+
+Everything runs on your computer. The only time anything leaves it is when you add a VirusTotal key, and even then Barry sends only SHA-256 fingerprints, never files or file names. The web app works the same way: files are read inside the browser, and the only thing sent anywhere is a fingerprint, when you tap a VirusTotal link.
+
+## Limits
+
+No scanner can prove a file is safe. Barry reads files without running them, so brand-new malware that is heavily packed or encrypted can hide its behaviour. When Barry can't see inside something (a passworded zip, a packed program, a RAR file), he says so and marks the download **Suspicious** rather than clean. "No threats found" means nothing suspicious was spotted. Only run software from people you trust.
+
+## Building from source
+
+```
+python -m venv .venv
+.venv\Scripts\activate            # source .venv/bin/activate on macOS
+pip install -e ".[dev,yara]"
+python -m pytest
+python -m antiloggingbear
+```
+
+Release builds come from GitHub Actions (`.github/workflows/build.yml`). The Windows build uses Python 3.8, the last version that supports Windows 7, with the pinned packages in `packaging/requirements-win7.txt`. The macOS build produces an app bundle and a disk image. To build locally:
+
+```
+pyinstaller packaging/AntiLoggingBear.spec
+```
+
+The web app lives in `web/`. The build script bundles the engine with [Pyodide](https://pyodide.org) (checksum-pinned) and the pure-Python dependencies, and GitHub Actions publishes it to GitHub Pages (`.github/workflows/web.yml`). To build and try it locally:
+
+```
+python tools/build_web.py            # writes build/web
+python tools/serve_web.py            # http://127.0.0.1:8765
+pip download --only-binary :all: --dest .cache/web/test-wheels pytest
+node tools/test_web_engine.mjs       # runs the engine tests inside the shipped Pyodide build
+```
+
+The artwork is drawn as SVG in `tools/barry.py`. `python tools/render_assets.py` regenerates the PNGs and icons in `src/antiloggingbear/assets` (it needs `resvg-py`).
+
+## Project layout
+
+```
+src/antiloggingbear/
+  engine/     archive walker, analyzers (pe, scripts, office, pdf, shortcuts), scoring, YARA, AV, VirusTotal
+  rules/      bundled YARA rules
+  ui/         Tk interface: main window, settings, alerts, tray
+  watch/      download watcher and quarantine
+  system/     paths, OS integration, notifications, single-instance handling
+web/          phone and browser version: page, scan worker, offline service worker
+tests/        synthetic samples generated at test time - no real malware in the repo
+tools/        artwork renderer, web build, local server, Pyodide test runner
+packaging/    PyInstaller spec, Inno Setup script, pinned Windows 7 requirements
+```
+
+## Licence
+
+MIT. Made by Priest.

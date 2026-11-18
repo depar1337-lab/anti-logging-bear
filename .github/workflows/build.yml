@@ -1,0 +1,73 @@
+name: Build
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  windows:
+    strategy:
+      matrix:
+        arch: [x64, x86]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.8"
+          architecture: ${{ matrix.arch }}
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r packaging/requirements-win7.txt
+      - run: pip install --no-deps .
+      - run: pyinstaller --noconfirm --distpath dist --workpath build packaging/AntiLoggingBear.spec
+      - name: Portable zip
+        shell: pwsh
+        run: Compress-Archive -Path dist/AntiLoggingBear/* -DestinationPath dist/AntiLoggingBear-${{ matrix.arch }}-portable.zip
+      - name: Installer
+        shell: pwsh
+        run: |
+          $version = (Select-String -Path pyproject.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$version" "/DArch=${{ matrix.arch }}" packaging/installer.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-${{ matrix.arch }}
+          path: |
+            dist/*.zip
+            dist/*-setup.exe
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip
+      - run: pip install . yara-python pyinstaller
+      - run: pyinstaller --noconfirm --distpath dist --workpath build packaging/AntiLoggingBear.spec
+      - name: Disk image
+        run: |
+          mkdir -p dmg
+          cp -R "dist/Anti-Logging Bear.app" dmg/
+          ln -s /Applications dmg/Applications
+          hdiutil create -volname "Anti-Logging Bear" -srcfolder dmg -ov -format UDZO "dist/AntiLoggingBear-macOS.dmg"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos
+          path: dist/*.dmg
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows, macos]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: artifacts/**/*
