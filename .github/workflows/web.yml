@@ -25,7 +25,7 @@ jobs:
         with:
           node-version: "22"
       - run: python tools/build_web.py --out build/web
-      - run: python -m pip download --quiet --only-binary :all: --dest .cache/web/test-wheels pytest
+      - run: python -m pip download --quiet --only-binary ":all:" --dest .cache/web/test-wheels pytest
       - name: Engine tests in Pyodide
         run: node tools/test_web_engine.mjs build/web .cache/web/test-wheels
       - uses: actions/upload-pages-artifact@v3
