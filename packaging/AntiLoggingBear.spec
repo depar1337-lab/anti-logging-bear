@@ -2,6 +2,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 
 import os
+import platform
 import re
 import sys
 from pathlib import Path
@@ -13,11 +14,37 @@ PKG = ROOT / "src" / "antiloggingbear"
 IS_MAC = sys.platform == "darwin"
 VERSION = re.search(r'__version__ = "(.+)"', (PKG / "__init__.py").read_text()).group(1)
 
+
+def tkdnd_platform():
+    system, machine = platform.system(), platform.machine()
+    if system == "Windows":
+        machine = os.environ.get("PROCESSOR_ARCHITECTURE", machine)
+    return {
+        ("Darwin", "arm64"): "osx-arm64",
+        ("Darwin", "x86_64"): "osx-x64",
+        ("Linux", "aarch64"): "linux-arm64",
+        ("Linux", "x86_64"): "linux-x64",
+        ("Windows", "ARM64"): "win-arm64",
+        ("Windows", "AMD64"): "win-x64",
+        ("Windows", "x86"): "win-x86",
+    }.get((system, machine))
+
+
+def tkdnd_wanted(target):
+    parts = Path(target).parts
+    if "tkdnd" not in parts or parts.index("tkdnd") == len(parts) - 1:
+        return True
+    folder = parts[parts.index("tkdnd") + 1]
+    return folder in (TKDND, TKDND + "-tcl9")
+
+
+TKDND = tkdnd_platform()
+
 datas = [
     (str(PKG / "assets"), "antiloggingbear/assets"),
     (str(PKG / "rules"), "antiloggingbear/rules"),
 ]
-datas += collect_data_files("tkinterdnd2")
+datas += [entry for entry in collect_data_files("tkinterdnd2") if tkdnd_wanted(entry[1])]
 datas += collect_data_files("oletools", includes=["**/*.txt", "**/*.json"])
 
 hidden = ["pystray._win32"] if sys.platform == "win32" else []
