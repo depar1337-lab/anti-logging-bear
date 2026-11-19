@@ -21,6 +21,13 @@ jobs:
       - run: pip install -r packaging/requirements-win7.txt
       - run: pip install --no-deps .
       - run: pyinstaller --noconfirm --distpath dist --workpath build packaging/BarryBear.spec
+      - name: Smoke test
+        shell: pwsh
+        run: |
+          Set-Content -Path note.txt -Value hello
+          $run = Start-Process -FilePath dist/BarryBear/BarryBear.exe -ArgumentList "note.txt", "--no-av" -Wait -PassThru -NoNewWindow
+          if ($run.ExitCode -ne 0) { throw "BarryBear.exe exited with code $($run.ExitCode)" }
+          if (-not (Test-Path dist/BarryBear/_internal/tkinterdnd2)) { throw "drag-and-drop library missing" }
       - name: Portable zip
         shell: pwsh
         run: Compress-Archive -Path dist/BarryBear/* -DestinationPath dist/BarryBear-${{ matrix.arch }}-portable.zip
