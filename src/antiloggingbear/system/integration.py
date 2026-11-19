@@ -9,7 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from .. import APP_NAME
+from .. import APP_NAME, DATA_NAME
 from . import paths
 
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
@@ -42,6 +42,8 @@ def set_start_at_login(enabled: bool) -> None:
     if sys.platform == "win32":
         import winreg
         with winreg.CreateKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as key:
+            with contextlib.suppress(FileNotFoundError):
+                winreg.DeleteValue(key, DATA_NAME)
             if enabled:
                 winreg.SetValueEx(key, APP_NAME, 0, winreg.REG_SZ, _quote(command))
             else:
@@ -72,7 +74,7 @@ def set_context_menu(enabled: bool) -> None:
     if enabled:
         icon = sys.executable if getattr(sys, "frozen", False) else str(paths.asset("app.ico"))
         with winreg.CreateKey(winreg.HKEY_CURRENT_USER, MENU_KEY) as key:
-            winreg.SetValueEx(key, None, 0, winreg.REG_SZ, "Check with Anti-Logging Bear")
+            winreg.SetValueEx(key, None, 0, winreg.REG_SZ, f"Check with {APP_NAME}")
             winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, icon)
         with winreg.CreateKey(winreg.HKEY_CURRENT_USER, MENU_KEY + r"\command") as key:
             winreg.SetValueEx(key, None, 0, winreg.REG_SZ, _quote(launch_command() + ["--gui"]) + ' "%1"')

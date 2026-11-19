@@ -61,7 +61,7 @@ class VirusTotal:
             time.sleep(wait)
         request = urllib.request.Request(API + sha256, headers={
             "x-apikey": self.api_key,
-            "User-Agent": "AntiLoggingBear/" + __version__,
+            "User-Agent": "BarryBear/" + __version__,
         })
         self._last_call = time.monotonic()
         try:

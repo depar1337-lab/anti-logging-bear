@@ -20,10 +20,10 @@ jobs:
       - run: python -m pip install --upgrade pip
       - run: pip install -r packaging/requirements-win7.txt
       - run: pip install --no-deps .
-      - run: pyinstaller --noconfirm --distpath dist --workpath build packaging/AntiLoggingBear.spec
+      - run: pyinstaller --noconfirm --distpath dist --workpath build packaging/BarryBear.spec
       - name: Portable zip
         shell: pwsh
-        run: Compress-Archive -Path dist/AntiLoggingBear/* -DestinationPath dist/AntiLoggingBear-${{ matrix.arch }}-portable.zip
+        run: Compress-Archive -Path dist/BarryBear/* -DestinationPath dist/BarryBear-${{ matrix.arch }}-portable.zip
       - name: Installer
         shell: pwsh
         run: |
@@ -64,19 +64,19 @@ jobs:
           platform="macosx_${MACOSX_DEPLOYMENT_TARGET/./_}_${{ matrix.arch }}"
           python -m pip download --only-binary :all: --no-deps --python-version 3.12 --platform "$platform" --dest yara-wheel yara-python
           python -m pip install yara-wheel/*.whl
-      - run: pyinstaller --noconfirm --distpath dist --workpath build packaging/AntiLoggingBear.spec
+      - run: pyinstaller --noconfirm --distpath dist --workpath build packaging/BarryBear.spec
       - name: Check minimum macOS
-        run: python packaging/macos_minimum.py "dist/Anti-Logging Bear.app" "$MACOSX_DEPLOYMENT_TARGET" tkinterdnd2/
+        run: python packaging/macos_minimum.py "dist/Barry Bear.app" "$MACOSX_DEPLOYMENT_TARGET" tkinterdnd2/
       - name: Smoke test
         run: |
           echo hello > note.txt
-          "dist/Anti-Logging Bear.app/Contents/MacOS/Anti-Logging Bear" note.txt --no-av
+          "dist/Barry Bear.app/Contents/MacOS/Barry Bear" note.txt --no-av
       - name: Disk image
         run: |
           mkdir -p dmg
-          cp -R "dist/Anti-Logging Bear.app" dmg/
+          cp -R "dist/Barry Bear.app" dmg/
           ln -s /Applications dmg/Applications
-          hdiutil create -volname "Anti-Logging Bear" -srcfolder dmg -ov -format UDZO "dist/AntiLoggingBear-macOS-${{ matrix.name }}.dmg"
+          hdiutil create -volname "Barry Bear" -srcfolder dmg -ov -format UDZO "dist/BarryBear-macOS-${{ matrix.name }}.dmg"
       - uses: actions/upload-artifact@v4
         with:
           name: macos-${{ matrix.name }}

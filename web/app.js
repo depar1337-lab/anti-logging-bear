@@ -97,7 +97,7 @@ function handleWorker(message) {
         settings.engineLoaded = true;
         store(SETTINGS_KEY, settings);
       }
-      $("about-version").textContent = `Anti-Logging Bear ${engineVersion} (web)`;
+      $("about-version").textContent = `Barry Bear ${engineVersion} (web)`;
       setEngineStatus("");
       if (currentJob) $("scan-step").textContent = "Reading the file...";
       break;
@@ -316,7 +316,7 @@ async function saveReport() {
   const touch = matchMedia("(pointer: coarse)").matches;
   if (touch && navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
-      await navigator.share({ files: [file], title: "Anti-Logging Bear report" });
+      await navigator.share({ files: [file], title: "Barry Bear report" });
       return;
     } catch (error) {
       if (error && error.name === "AbortError") return;
@@ -366,12 +366,12 @@ const UNSIGNED_MAC = "The app isn't notarised yet, so the first time, right-clic
 const MAC_CHIP = "Not sure which Mac you have? Open Apple menu > About This Mac. If it lists a Chip, it's Apple silicon. If it lists a Processor, it's Intel.";
 
 const BUILDS = {
-  windows: { label: "Download for Windows", name: "Windows installer", detail: "Windows 7 to 11, 64-bit. Most PCs.", file: "AntiLoggingBear-x64-setup.exe" },
-  windows32: { label: "Download for Windows (32-bit)", name: "Windows installer, 32-bit", detail: "Older 32-bit Windows 7 to 10.", file: "AntiLoggingBear-x86-setup.exe" },
-  portable: { name: "Portable zip", detail: "No installer. Unzip and run, 64-bit.", file: "AntiLoggingBear-x64-portable.zip" },
-  portable32: { name: "Portable zip, 32-bit", detail: "No installer, for 32-bit Windows.", file: "AntiLoggingBear-x86-portable.zip" },
-  macArm: { label: "Download for Mac", short: "Mac with Apple silicon", name: "Mac with Apple silicon", detail: "M1 or later, macOS 11 or newer.", file: "AntiLoggingBear-macOS-AppleSilicon.dmg" },
-  macIntel: { label: "Download for Intel Mac", short: "Intel Mac", name: "Intel Mac", detail: "macOS 10.15 or newer.", file: "AntiLoggingBear-macOS-Intel.dmg" },
+  windows: { label: "Download for Windows", name: "Windows installer", detail: "Windows 7 to 11, 64-bit. Most PCs.", file: "BarryBear-x64-setup.exe" },
+  windows32: { label: "Download for Windows (32-bit)", name: "Windows installer, 32-bit", detail: "Older 32-bit Windows 7 to 10.", file: "BarryBear-x86-setup.exe" },
+  portable: { name: "Portable zip", detail: "No installer. Unzip and run, 64-bit.", file: "BarryBear-x64-portable.zip" },
+  portable32: { name: "Portable zip, 32-bit", detail: "No installer, for 32-bit Windows.", file: "BarryBear-x86-portable.zip" },
+  macArm: { label: "Download for Mac", short: "Mac with Apple silicon", name: "Mac with Apple silicon", detail: "M1 or later, macOS 11 or newer.", file: "BarryBear-macOS-AppleSilicon.dmg" },
+  macIntel: { label: "Download for Intel Mac", short: "Intel Mac", name: "Intel Mac", detail: "macOS 10.15 or newer.", file: "BarryBear-macOS-Intel.dmg" },
 };
 
 const GROUPS = [

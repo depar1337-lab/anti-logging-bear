@@ -9,6 +9,7 @@ from dataclasses import replace
 from tkinter import filedialog, messagebox, ttk
 from typing import TYPE_CHECKING
 
+from .. import APP_NAME
 from ..engine import antivirus
 from ..engine.yara_rules import shared_engine
 from ..settings import Settings
@@ -152,14 +153,14 @@ class SettingsDialog(tk.Toplevel):
 
     def _system_tab(self) -> None:
         page = self._page("System")
-        self._check(page, 0, "start_at_login", "Start Anti-Logging Bear when I log in",
+        self._check(page, 0, "start_at_login", f"Start {APP_NAME} when I log in",
                     "Barry starts quietly in the background so downloads are checked straight away.")
         if integration.supports_context_menu():
-            self._check(page, 2, "context_menu", "Add \"Check with Anti-Logging Bear\" to the right-click menu")
+            self._check(page, 2, "context_menu", f"Add \"Check with {APP_NAME}\" to the right-click menu")
             self._check(page, 3, "close_to_tray", "Keep watching from the system tray when I close the window")
         elif sys.platform == "darwin":
             ttk.Label(page, wraplength=520, justify="left", text=(
-                "To check a file from Finder, right-click it and choose Open With > Anti-Logging Bear.")
+                "To check a file from Finder, right-click it and choose Open With > Barry Bear.")
             ).grid(row=2, column=0, sticky="w", pady=(14, 0))
 
     def _quarantine_tab(self) -> None:
@@ -241,8 +242,8 @@ class SettingsDialog(tk.Toplevel):
 
     def _style_listbox(self, box: tk.Listbox) -> None:
         p = self.app.theme.palette
-        box.configure(background=p.panel, foreground=p.ink, selectbackground=p.select, selectforeground=p.ink,
-                      highlightthickness=1, highlightbackground=p.border, highlightcolor=p.focus, borderwidth=0)
+        box.configure(background=p.field, foreground=p.ink, selectbackground=p.select, selectforeground=p.select_ink,
+                      highlightthickness=0, relief="sunken", borderwidth=2)
 
     def _save(self) -> None:
         new: Settings = self.draft

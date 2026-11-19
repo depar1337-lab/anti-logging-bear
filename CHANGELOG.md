@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.0
+
+- The program is now called Barry Bear. Settings, history and quarantined files carry over from Anti-Logging Bear
+- Classic Windows look for the desktop app: bevelled buttons, title-barred windows, a block progress bar and a sunken status bar
+- Pixel-art Barry icon for the program, installer and shortcuts, and a classic install wizard with Barry on it
+- Download file names start with BarryBear
+
 ## 1.0.1
 
 - Mac app for Intel Macs (macOS 10.15 or later), alongside the Apple silicon build (macOS 11 or later)

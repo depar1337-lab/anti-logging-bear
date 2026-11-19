@@ -87,6 +87,7 @@ class Application:
         if self.settings.close_to_tray or background:
             from .ui.tray import create_tray
             self.tray = create_tray(self)
+        self._refresh_integration()
         self._restart_watcher()
         self._refresh_engine_status()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -97,6 +98,15 @@ class Application:
     def run(self) -> int:
         self.root.mainloop()
         return 0
+
+    def _refresh_integration(self) -> None:
+        if not getattr(sys, "frozen", False):
+            return
+        with contextlib.suppress(OSError):
+            if self.settings.start_at_login:
+                integration.set_start_at_login(True)
+            if self.settings.context_menu:
+                integration.set_context_menu(True)
 
     def _set_icon(self) -> None:
         try:

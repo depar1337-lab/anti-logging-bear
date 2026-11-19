@@ -10,7 +10,16 @@ from typing import TYPE_CHECKING
 from .. import APP_NAME
 from ..engine.findings import ScanReport, Severity, Verdict
 from ..report import plain_reasons
-from .widgets import Barry, DropZone, VerdictIcon, WrapLabel, copy_to_clipboard, load_image
+from .widgets import (
+    Barry,
+    BlockProgress,
+    DropZone,
+    VerdictIcon,
+    Window,
+    WrapLabel,
+    copy_to_clipboard,
+    load_image,
+)
 
 if TYPE_CHECKING:
     from ..app import Application
@@ -46,8 +55,10 @@ class MainWindow:
         self.show_idle()
 
     def _build_header(self) -> None:
-        header = ttk.Frame(self.root, style="Header.TFrame", padding=(20, 14, 20, 0))
+        header = ttk.Frame(self.root, style="Header.TFrame", padding=(16, 10, 16, 0))
         header.pack(fill="x")
+        self.header_icon = tk.Label(header, borderwidth=0)
+        self.header_icon.pack(side="left", anchor="n", padx=(0, 10), pady=(2, 0))
         titles = ttk.Frame(header, style="Header.TFrame")
         titles.pack(side="left", anchor="w")
         ttk.Label(titles, text=APP_NAME, style="HeaderTitle.TLabel").pack(anchor="w")
@@ -68,12 +79,16 @@ class MainWindow:
     def _paint_forest(self) -> None:
         p = self.theme.palette
         try:
+            self.header_icon.configure(image=load_image(self.root, "icon-32.png"), background=p.header)
+        except (FileNotFoundError, tk.TclError):
+            self.header_icon.configure(background=p.header)
+        try:
             self.forest.configure(image=load_image(self.root, "forest.png"), background=p.header, anchor="sw")
         except (FileNotFoundError, tk.TclError):
             self.forest.configure(height=1, background=p.header)
 
     def _build_body(self) -> None:
-        body = ttk.Frame(self.root, padding=(20, 16, 20, 8))
+        body = ttk.Frame(self.root, padding=(16, 12, 16, 8))
         body.pack(fill="both", expand=True)
         body.columnconfigure(1, weight=1)
         body.rowconfigure(0, weight=1)
@@ -81,14 +96,17 @@ class MainWindow:
         self.barry = Barry(body, "idle")
         self.barry.grid(row=0, column=0, sticky="s", padx=(0, 18))
 
-        self.card = ttk.Frame(body, style="Card.TFrame", padding=18)
-        self.card.grid(row=0, column=1, sticky="nsew")
+        self.pane = Window(body, self.theme, padding=14)
+        self.pane.grid(row=0, column=1, sticky="nsew")
+        self.card = self.pane.body
         self.card.columnconfigure(0, weight=1)
         self.card.rowconfigure(0, weight=1)
 
         self.idle_panel = self._build_idle(self.card)
         self.scan_panel = self._build_scanning(self.card)
         self.result_panel = ttk.Frame(self.card, style="Panel.TFrame")
+        self.panel_titles = {self.idle_panel: "Check a download", self.scan_panel: "Checking...",
+                             self.result_panel: "Result"}
 
     def _build_idle(self, parent: tk.Misc) -> ttk.Frame:
         frame = ttk.Frame(parent, style="Panel.TFrame")
@@ -114,7 +132,7 @@ class MainWindow:
         self.scan_title.grid(row=0, column=0, sticky="w")
         ttk.Label(frame, text="Reading the files inside without unzipping or running them.",
                   style="CardMuted.TLabel").grid(row=1, column=0, sticky="w", pady=(4, 14))
-        self.progress = ttk.Progressbar(frame, mode="indeterminate")
+        self.progress = BlockProgress(frame, self.theme)
         self.progress.grid(row=2, column=0, sticky="ew")
         self.scan_file = ttk.Label(frame, text="", style="CardMuted.TLabel")
         self.scan_file.grid(row=3, column=0, sticky="w", pady=(8, 16))
@@ -141,7 +159,7 @@ class MainWindow:
         self.details.add(files_tab, text="Files")
 
         ioc_tab = ttk.Frame(self.details, padding=6)
-        self.ioc_list = tk.Listbox(ioc_tab, height=6, activestyle="none", borderwidth=0, highlightthickness=1,
+        self.ioc_list = tk.Listbox(ioc_tab, height=6, activestyle="none", borderwidth=2, highlightthickness=0,
                                    font="ALB.Mono", exportselection=False)
         self.ioc_list.pack(fill="both", expand=True)
         self.ioc_list.bind("<Control-c>", lambda _e: self._copy_ioc())
@@ -180,12 +198,15 @@ class MainWindow:
         return tree
 
     def _build_status(self) -> None:
-        bar = ttk.Frame(self.root, padding=(20, 4, 20, 8))
+        bar = ttk.Frame(self.root, padding=(2, 2, 2, 2))
         bar.pack(fill="x", side="bottom")
-        self.status = ttk.Label(bar, text="", style="Status.TLabel")
-        self.status.pack(side="left")
-        self.engine_status = ttk.Label(bar, text="", style="Status.TLabel")
-        self.engine_status.pack(side="right")
+        self.status = tk.Label(bar, text="", anchor="w", relief="sunken", borderwidth=1, font="ALB.Small",
+                               padx=6, pady=1)
+        self.status.pack(side="left", fill="x", expand=True)
+        self.engine_status = tk.Label(bar, text="", anchor="w", relief="sunken", borderwidth=1, font="ALB.Small",
+                                      padx=6, pady=1)
+        self.engine_status.pack(side="right", padx=(2, 0))
+        self._paint_status()
 
     def _bind_keys(self) -> None:
         mod = "Command" if self.root.tk.call("tk", "windowingsystem") == "aqua" else "Control"
@@ -206,6 +227,7 @@ class MainWindow:
             if child is not panel:
                 child.grid_forget()
         panel.grid(row=0, column=0, sticky="nsew")
+        self.pane.set_title(self.panel_titles[panel])
 
     def show_idle(self) -> None:
         self.progress.stop()
@@ -235,7 +257,7 @@ class MainWindow:
         panel.columnconfigure(0, weight=1)
 
         fg, bg = self.theme.verdict_colours(verdict)
-        banner = tk.Frame(panel, background=bg, highlightthickness=1, highlightbackground=fg)
+        banner = tk.Frame(panel, background=bg, borderwidth=2, relief="sunken")
         banner.grid(row=0, column=0, sticky="ew")
         icon = VerdictIcon(banner, self.theme)
         icon.draw(verdict, bg)
@@ -354,7 +376,7 @@ class MainWindow:
 
     def set_details_visible(self, visible: bool) -> None:
         if visible:
-            self.details.pack(fill="both", expand=True, padx=20, pady=(0, 4), before=self.status.master)
+            self.details.pack(fill="both", expand=True, padx=16, pady=(0, 6), before=self.status.master)
             self.details_button.configure(text="Hide details")
             if self.root.winfo_height() < 760:
                 self.root.geometry(f"{max(self.root.winfo_width(), 900)}x820")
@@ -373,15 +395,24 @@ class MainWindow:
 
     def retheme(self) -> None:
         self._paint_forest()
+        self._paint_status()
+        self.pane.retheme()
+        self.progress.configure(height=round(22 * self.theme.scale))
         self.drop_zone.redraw()
         self._restyle_listbox()
         if self.report is not None and self.result_panel.winfo_ismapped():
             self.show_result(self.report)
 
+    def _paint_status(self) -> None:
+        p = self.theme.palette
+        for label in (self.status, self.engine_status):
+            label.configure(background=p.bg, foreground=p.muted)
+
     def _restyle_listbox(self) -> None:
         p = self.theme.palette
-        self.ioc_list.configure(background=p.panel, foreground=p.ink, selectbackground=p.select,
-                                selectforeground=p.ink, highlightbackground=p.border, highlightcolor=p.focus)
+        self.ioc_list.configure(background=p.field, foreground=p.ink, selectbackground=p.select,
+                                selectforeground=p.select_ink, relief="sunken", borderwidth=2,
+                                highlightthickness=0)
 
 
 def _size(n: int) -> str:

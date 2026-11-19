@@ -67,18 +67,18 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="Anti-Logging Bear" if IS_MAC else "AntiLoggingBear",
+    name="Barry Bear" if IS_MAC else "BarryBear",
     console=False,
     upx=False,
     icon=str(PKG / "assets" / ("app.icns" if IS_MAC else "app.ico")),
 )
 
-coll = COLLECT(exe, a.binaries, a.datas, upx=False, name="AntiLoggingBear")
+coll = COLLECT(exe, a.binaries, a.datas, upx=False, name="BarryBear")
 
 if IS_MAC:
     app = BUNDLE(
         coll,
-        name="Anti-Logging Bear.app",
+        name="Barry Bear.app",
         icon=str(PKG / "assets" / "app.icns"),
         bundle_identifier="com.priest.antiloggingbear",
         info_plist={

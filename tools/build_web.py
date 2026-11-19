@@ -32,7 +32,7 @@ SKIP_IN_WHEELS = ("/tests/", ".dist-info/RECORD")
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Build the Anti-Logging Bear web app")
+    parser = argparse.ArgumentParser(description="Build the Barry Bear web app")
     parser.add_argument("--out", default=str(ROOT / "build" / "web"), help="output folder")
     args = parser.parse_args()
 

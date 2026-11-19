@@ -1,8 +1,8 @@
-# Anti-Logging Bear
+# Barry Bear
 
 **Stop the loggers. Protect your forest of files.**
 
-Anti-Logging Bear checks downloads for keyloggers, password stealers and other malware *before* you unzip or run them. Drop a zip on Barry and he reads every file inside it straight from the archive. Nothing gets extracted to disk and nothing runs.
+Barry Bear, the anti-logging bear, checks downloads for keyloggers, password stealers and other malware *before* you unzip or run them. Drop a zip on Barry and he reads every file inside it straight from the archive. Nothing gets extracted to disk and nothing runs.
 
 ![Main window](docs/main-window.png)
 
@@ -68,9 +68,9 @@ Settings cover watched folders and exclusions, strict mode, custom YARA rules, f
 
 Download a build from the [Releases page](https://github.com/depar1337-lab/anti-logging-bear/releases/latest). The web app also offers the right download when you open it on a Windows PC or a Mac.
 
-- **Windows 7 SP1 to Windows 11**: `AntiLoggingBear-x64-setup.exe`. Use the `x86` build on 32-bit Windows. Portable zips are also available. Windows 7 needs update KB2533623, which most patched systems already have.
+- **Windows 7 SP1 to Windows 11**: `BarryBear-x64-setup.exe`. Use the `x86` build on 32-bit Windows. Portable zips are also available. Windows 7 needs update KB2533623, which most patched systems already have.
 - **iPhone, iPad and Android**: no install needed, see [above](#iphone-ipad-and-android).
-- **macOS**: `AntiLoggingBear-macOS-AppleSilicon.dmg` for M1 or later (macOS 11+), or `AntiLoggingBear-macOS-Intel.dmg` for Intel Macs (macOS 10.15+). About This Mac shows a **Chip** on Apple silicon and a **Processor** on Intel. On Apple silicon, dragging files onto the window needs macOS 14; on older versions use **Choose a file** or **Open With**. The app isn't notarised yet, so the first time you open it, right-click it and choose **Open**. To check a file from Finder, right-click it and choose **Open With > Anti-Logging Bear**.
+- **macOS**: `BarryBear-macOS-AppleSilicon.dmg` for M1 or later (macOS 11+), or `BarryBear-macOS-Intel.dmg` for Intel Macs (macOS 10.15+). About This Mac shows a **Chip** on Apple silicon and a **Processor** on Intel. On Apple silicon, dragging files onto the window needs macOS 14; on older versions use **Choose a file** or **Open With**. The app isn't notarised yet, so the first time you open it, right-click it and choose **Open**. To check a file from Finder, right-click it and choose **Open With > Barry Bear**.
 
 No administrator rights are needed. Barry installs per user, and every setting lives in your own profile.
 
@@ -107,7 +107,7 @@ python -m antiloggingbear
 Release builds come from GitHub Actions (`.github/workflows/build.yml`). The Windows build uses Python 3.8, the last version that supports Windows 7, with the pinned packages in `packaging/requirements-win7.txt`. The macOS build produces an app bundle and a disk image. To build locally:
 
 ```
-pyinstaller packaging/AntiLoggingBear.spec
+pyinstaller packaging/BarryBear.spec
 ```
 
 The web app lives in `web/`. The build script bundles the engine with [Pyodide](https://pyodide.org) (checksum-pinned) and the pure-Python dependencies, and GitHub Actions publishes it to GitHub Pages (`.github/workflows/web.yml`). To build and try it locally:

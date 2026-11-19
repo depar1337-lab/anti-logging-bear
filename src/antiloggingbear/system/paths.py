@@ -6,7 +6,7 @@ import os
 import sys
 from pathlib import Path
 
-from .. import APP_NAME
+from .. import DATA_NAME
 
 ASSETS = Path(__file__).resolve().parent.parent / "assets"
 
@@ -14,9 +14,9 @@ ASSETS = Path(__file__).resolve().parent.parent / "assets"
 def config_dir() -> Path:
     if sys.platform == "win32":
         base = Path(os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming")
-        path = base / APP_NAME
+        path = base / DATA_NAME
     elif sys.platform == "darwin":
-        path = Path.home() / "Library" / "Application Support" / APP_NAME
+        path = Path.home() / "Library" / "Application Support" / DATA_NAME
     else:
         path = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "anti-logging-bear"
     path.mkdir(parents=True, exist_ok=True)

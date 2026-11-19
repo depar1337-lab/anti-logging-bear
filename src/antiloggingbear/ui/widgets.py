@@ -78,9 +78,9 @@ class VerdictIcon(tk.Canvas):
 
 
 class DropZone(tk.Canvas):
-    def __init__(self, master: tk.Misc, theme: Theme, on_click, height: int = 170) -> None:
-        super().__init__(master, height=height, highlightthickness=2, borderwidth=0, takefocus=1,
-                         cursor="hand2")
+    def __init__(self, master: tk.Misc, theme: Theme, on_click, height: int = 160) -> None:
+        super().__init__(master, height=height, highlightthickness=0, borderwidth=2, relief="sunken",
+                         takefocus=1, cursor="hand2")
         self.theme = theme
         self.on_click = on_click
         self.hover = False
@@ -104,16 +104,111 @@ class DropZone(tk.Canvas):
         p = self.theme.palette
         w, h = self.winfo_width(), self.winfo_height()
         focused = self.focus_get() is self
-        self.configure(background=p.select if self.hover else p.panel,
-                       highlightbackground=p.panel, highlightcolor=p.focus,
-                       highlightthickness=2 if focused else 0)
+        self.configure(background=p.field)
         self.delete("all")
-        self.create_rectangle(8, 8, w - 8, h - 8, outline=p.accent, width=2, dash=(8, 6))
-        self.create_text(w / 2, h / 2 - 22, text="Drop a download here", fill=p.ink, font="ALB.Heading")
+        if self.hover:
+            self.create_rectangle(6, 6, w - 6, h - 6, outline="", fill=p.clean[1] if p.field != "#000000" else p.field)
+        self.create_rectangle(10, 10, w - 10, h - 10, outline=p.accent if p.accent != "#000000" else p.ink,
+                              width=1, dash=(4, 3))
+        if focused:
+            self.create_rectangle(5, 5, w - 5, h - 5, outline=p.focus, width=1, dash=(1, 2))
+        self.create_text(w / 2, h / 2 - 20, text="Drop a download here", fill=p.ink, font="ALB.Heading")
         self.create_text(w / 2, h / 2 + 6, text="Barry checks zips, programs, scripts and documents",
                          fill=p.muted, font="ALB.Body")
-        self.create_text(w / 2, h / 2 + 30, text="without unzipping or running anything.",
+        self.create_text(w / 2, h / 2 + 26, text="without unzipping or running anything.",
                          fill=p.muted, font="ALB.Body")
+
+
+class TitleBar(tk.Canvas):
+    def __init__(self, master: tk.Misc, theme: Theme, text: str = "") -> None:
+        super().__init__(master, highlightthickness=0, borderwidth=0)
+        self.theme = theme
+        self.text = text
+        self.bind("<Configure>", lambda _e: self.redraw())
+        self.retheme()
+
+    def set_text(self, text: str) -> None:
+        self.text = text
+        self.redraw()
+
+    def retheme(self) -> None:
+        self.configure(height=round(22 * self.theme.scale))
+        self.redraw()
+
+    def redraw(self) -> None:
+        p = self.theme.palette
+        w, h = max(self.winfo_width(), 1), max(self.winfo_height(), 1)
+        self.delete("all")
+        start, end = _rgb(self, p.title), _rgb(self, p.title_end)
+        step = 4
+        for x in range(0, w, step):
+            t = x / max(w - 1, 1)
+            colour = "#" + "".join(f"{round(a + (b - a) * t):02x}" for a, b in zip(start, end))
+            self.create_rectangle(x, 0, x + step, h, fill=colour, outline="")
+        self.create_text(6, h / 2, text=self.text, anchor="w", fill=p.title_ink, font="ALB.Bold")
+
+
+class Window(tk.Frame):
+    def __init__(self, master: tk.Misc, theme: Theme, title: str = "", padding: int = 12) -> None:
+        super().__init__(master, borderwidth=2, relief="raised", highlightthickness=0)
+        self.theme = theme
+        self.title_bar = TitleBar(self, theme, title)
+        self.title_bar.pack(fill="x", padx=1, pady=1)
+        self.body = ttk.Frame(self, style="Panel.TFrame", padding=padding)
+        self.body.pack(fill="both", expand=True)
+        self.retheme()
+
+    def set_title(self, text: str) -> None:
+        self.title_bar.set_text(text)
+
+    def retheme(self) -> None:
+        self.configure(background=self.theme.palette.panel)
+        self.title_bar.retheme()
+
+
+class BlockProgress(tk.Canvas):
+    BLOCK, GAP = 9, 2
+
+    def __init__(self, master: tk.Misc, theme: Theme) -> None:
+        super().__init__(master, height=round(22 * theme.scale), highlightthickness=0, borderwidth=2,
+                         relief="sunken")
+        self.theme = theme
+        self.position = 0
+        self._job = None
+        self.bind("<Configure>", lambda _e: self.redraw())
+
+    def start(self, interval: int = 60) -> None:
+        self.stop()
+        self.position = 0
+
+        def tick() -> None:
+            width = max(self.winfo_width() - 8, 1)
+            self.position = 0 if self.position >= width else self.position + self.BLOCK + self.GAP
+            self.redraw()
+            self._job = self.after(max(interval * 5, 60), tick)
+
+        tick()
+
+    def stop(self) -> None:
+        if self._job is not None:
+            self.after_cancel(self._job)
+            self._job = None
+
+    def redraw(self) -> None:
+        p = self.theme.palette
+        h = self.winfo_height()
+        self.configure(background=p.field)
+        self.delete("all")
+        fill = p.accent if p.accent != "#000000" else p.select
+        x = 4
+        while x + self.BLOCK <= 4 + self.position:
+            self.create_rectangle(x, 4, x + self.BLOCK, h - 4, fill=fill, outline="")
+            x += self.BLOCK + self.GAP
+
+
+def _rgb(widget: tk.Misc, colour: str) -> tuple:
+    r, g, b = widget.winfo_rgb(colour)
+    return r // 256, g // 256, b // 256
 
 
 class WrapLabel(ttk.Label):
