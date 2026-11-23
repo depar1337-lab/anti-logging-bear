@@ -89,6 +89,9 @@ def compile_bundle(yara, bundle: Bundle, cache_dir: Path | None):
     missing = [feature for feature, probe in _FEATURE_PROBES.items() if not _compiles(yara, probe)]
     blocks = _RULE_START.split(bundle.source)
     head, blocks = blocks[0], blocks[1:]
+    for feature in missing:
+        if feature.endswith(".") and not _compiles(yara, f'import "{feature[:-1]}"'):
+            head = _drop_import(head, feature[:-1])
     kept = _without_dependents([b for b in blocks if not any(feature in b for feature in missing)], blocks)
     rules = None
     last_error = ""
@@ -101,8 +104,11 @@ def compile_bundle(yara, bundle: Bundle, cache_dir: Path | None):
             culprit = _UNSUPPORTED.search(last_error)
             if culprit:
                 name = culprit.group(1)
+                if "unknown module" in last_error:
+                    head = _drop_import(head, name)
+                    name += "."
                 fewer = _without_dependents([b for b in kept if name not in _condition(b)], blocks)
-                if len(fewer) < len(kept):
+                if len(fewer) < len(kept) or "unknown module" in last_error:
                     kept = fewer
                     continue
             index = _block_at_line(head, kept, last_error)
@@ -165,6 +171,10 @@ def _without_dependents(kept: list, everything: list) -> list:
         dropped = {name for name, _b in rules} - {name for name, _b in survivors}
         rules = survivors
     return [block for _name, block in rules]
+
+
+def _drop_import(head: str, module: str) -> str:
+    return re.sub(r'(?m)^\s*import\s+"' + re.escape(module) + r'"\s*$', "", head)
 
 
 def _condition(block: str) -> str:
