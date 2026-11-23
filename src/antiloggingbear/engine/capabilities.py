@@ -130,8 +130,10 @@ def assess(path: str, caps: Capabilities, prefix: str) -> list[Finding]:
                  "Reads server login dialogs and can connect to the internet", DIALOG_INPUT, NETWORK)
 
     if caps.has(EXFIL) and not keys and not caps.any(CREDENTIALS, DIALOG_INPUT):
-        emit("exfil", Severity.HIGH,
-             "Sends data to a webhook, chat bot or paste site", EXFIL)
+        tunnels_only = all("ngrok" in item.lower() for item in caps.evidence(EXFIL))
+        emit("exfil", Severity.MEDIUM if tunnels_only else Severity.HIGH,
+             "Connects to a public tunnel service (used by remote-access tools, and by developers)"
+             if tunnels_only else "Sends data to a webhook, chat bot or paste site", EXFIL)
 
     if caps.has(CLIPBOARD) and caps.has(EXFIL):
         emit("clipboard", Severity.HIGH,

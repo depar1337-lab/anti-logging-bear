@@ -45,6 +45,17 @@ DEFENDER_TAMPER = re.compile(
 )
 
 
+def keylog_marker(text: str) -> str:
+    seen = []
+    for match in KEYLOG_MARKERS.finditer(text):
+        marker = match.group().upper()
+        if marker not in seen:
+            seen.append(marker)
+            if len(seen) >= 2:
+                return ", ".join(seen)
+    return ""
+
+
 def discord_token(text: str) -> str:
     for match in DISCORD_TOKEN.finditer(text):
         token = match.group()

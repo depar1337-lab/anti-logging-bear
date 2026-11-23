@@ -86,9 +86,9 @@ def analyze_pe(path: str, data: bytes, children: list | None = None, depth: int 
 
     for endpoint in ioc.exfil_endpoints(strings):
         caps.add(cap.EXFIL, endpoint)
-    marker = ioc.KEYLOG_MARKERS.search(strings)
+    marker = ioc.keylog_marker(strings)
     if marker:
-        caps.add(cap.KEYLOG_MARKER, marker.group())
+        caps.add(cap.KEYLOG_MARKER, marker)
     m = ioc.BROWSER_SECRETS.search(strings)
     if m:
         caps.add(cap.CREDENTIALS, m.group())

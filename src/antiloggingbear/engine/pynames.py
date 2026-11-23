@@ -25,6 +25,7 @@ STDLIB = frozenset({
 })
 
 LIBRARIES = frozenset({
+    "antiloggingbear",
     "Crypto", "Cryptodome", "OpenSSL", "PIL", "PIL._imaging", "PyQt5", "PyQt6", "PySide2", "PySide6",
     "_distutils_hack", "aiogram", "aiohappyeyeballs", "aiohttp", "aiosignal", "annotated_types", "anyio",
     "async_timeout", "attr", "attrs", "browser_cookie3", "bs4", "cachetools", "certifi", "certifi_win32",

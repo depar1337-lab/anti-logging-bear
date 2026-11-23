@@ -49,7 +49,9 @@ CAPABILITY_RULES: list[tuple[str, Pattern[str], str]] = [
 
     (cap.CREDENTIALS, _rx(r"CryptUnprotectData|win32crypt|ProtectedData\]::Unprotect|\bbrowser_cookie3\b"),
      "decrypts saved browser data"),
-    (cap.CREDENTIALS, _rx(r"discord_desktop_core|\b(?:win-dpapi|@primno/dpapi|node-dpapi)\b"),
+    (cap.CREDENTIALS, _rx(r"discord_desktop_core[\s\S]{0,400}?\b(?:writeFileSync|writeFile|appendFileSync|createWriteStream)\b"
+                          r"|\b(?:writeFileSync|writeFile|appendFileSync)\b[\s\S]{0,400}?discord_desktop_core"
+                          r"|\b(?:win-dpapi|@primno/dpapi|node-dpapi)\b"),
      "tampers with the Discord app or decrypts saved passwords"),
     (cap.DIALOG_INPUT, _rx(r"sampGetCurrentDialogEditboxText|onSendDialogResponse"),
      "reads SA-MP dialog input (where passwords are typed)"),
@@ -180,9 +182,9 @@ def _scan_text(path: str, text: str, lang: str, decoded_depth: int, extra: cap.C
 
     for endpoint in ioc.exfil_endpoints(text):
         caps.add(cap.EXFIL, endpoint)
-    marker = ioc.KEYLOG_MARKERS.search(text)
+    marker = ioc.keylog_marker(text)
     if marker:
-        caps.add(cap.KEYLOG_MARKER, marker.group())
+        caps.add(cap.KEYLOG_MARKER, marker)
     m = ioc.BROWSER_SECRETS.search(text)
     if m:
         caps.add(cap.CREDENTIALS, f"browser data path ({_snippet(m.group())})")
