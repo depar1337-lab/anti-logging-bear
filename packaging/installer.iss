@@ -58,6 +58,7 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 
 [Run]
 Filename: "{app}\BarryBear.exe"; Description: "Start Barry Bear"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\BarryBear.exe"; Flags: nowait; Check: WizardSilent
 
 [UninstallRun]
 Filename: "{cmd}"; Parameters: "/c taskkill /im BarryBear.exe /f"; Flags: runhidden; RunOnceId: "StopApp"

@@ -37,6 +37,10 @@ class Settings:
     mb_api_key: str = ""
     mb_max_lookups: int = 25
 
+    check_updates: bool = True
+    updates_checked: str = ""
+    skipped_version: str = ""
+
     start_at_login: bool = False
     context_menu: bool = False
     close_to_tray: bool = True

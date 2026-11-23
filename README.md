@@ -75,6 +75,8 @@ Download a build from the [Releases page](https://github.com/depar1337-lab/anti-
 
 No administrator rights are needed. Barry installs per user, and every setting lives in your own profile.
 
+Barry checks for new versions once a day and asks before doing anything. On an installed Windows copy, **Update now** downloads the new installer, checks its SHA-256 fingerprint against the one GitHub publishes, installs it and restarts Barry. Portable and Mac copies open the right download instead. You can turn the check off, or check by hand, in Settings > System.
+
 ## Command line
 
 ```
@@ -89,7 +91,7 @@ Run `antiloggingbear --help` for every option.
 
 ## Privacy
 
-Everything runs on your computer. Files only leave it as SHA-256 fingerprints, and only if you add a VirusTotal or MalwareBazaar key; file names are never sent. Once a week Barry downloads the latest community YARA rules from GitHub, which sends nothing about you or your files (you can turn this off in Settings). The web app works the same way: files are read inside the browser, and the only thing sent anywhere is a fingerprint, when you tap a VirusTotal link.
+Everything runs on your computer. Files only leave it as SHA-256 fingerprints, and only if you add a VirusTotal or MalwareBazaar key; file names are never sent. Once a week Barry downloads the latest community YARA rules from GitHub, and once a day it asks GitHub whether a new version of Barry is out. Neither sends anything about you or your files, and both can be turned off in Settings. The web app works the same way: files are read inside the browser, and the only thing sent anywhere is a fingerprint, when you tap a VirusTotal link.
 
 ## Limits
 

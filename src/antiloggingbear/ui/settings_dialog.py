@@ -179,6 +179,10 @@ class SettingsDialog(tk.Toplevel):
             ttk.Label(page, wraplength=520, justify="left", text=(
                 "To check a file from Finder, right-click it and choose Open With > Barry Bear.")
             ).grid(row=2, column=0, sticky="w", pady=(14, 0))
+        self._check(page, 5, "check_updates", "Check for new versions of Barry every day",
+                    "Barry asks before downloading or installing anything.")
+        ttk.Button(page, text="Check now", command=self.app.check_for_updates).grid(
+            row=7, column=0, sticky="w", pady=(6, 0))
 
     def _quarantine_tab(self) -> None:
         page = self._page("Quarantine")

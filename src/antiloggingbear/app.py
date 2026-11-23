@@ -11,7 +11,7 @@ import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
-from . import APP_NAME, rule_updates
+from . import APP_NAME, __version__, app_updates, rule_updates
 from . import report as fmt
 from . import settings as config
 from .engine import antivirus, yara_rules
@@ -92,6 +92,8 @@ class Application:
         self._restart_watcher()
         self._refresh_engine_status()
         threading.Thread(target=self._prepare_rules, name="rules", daemon=True).start()
+        if self.settings.check_updates and app_updates.due(self.settings.updates_checked):
+            self.root.after(15000, lambda: self.check_for_updates(manual=False))
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         self.root.after(100, self._pump)
         for path in initial:
@@ -123,6 +125,34 @@ class Application:
             yara_rules.reset_shared()
             threading.Thread(target=self._prepare_rules, name="rules", daemon=True).start()
             self.window.set_status("Barry downloaded the latest community rules.")
+
+    def check_for_updates(self, manual: bool = True) -> None:
+        def work() -> None:
+            try:
+                update = app_updates.check()
+            except Exception as exc:
+                reason = str(exc)
+                if manual:
+                    self.post(lambda: messagebox.showerror(
+                        APP_NAME, f"Barry couldn't check for updates.\n\n{reason}", parent=self.root))
+                return
+            self.post(lambda: self._update_checked(update, manual))
+
+        threading.Thread(target=work, name="update-check", daemon=True).start()
+
+    def _update_checked(self, update, manual: bool) -> None:
+        self.settings.updates_checked = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+        self.save_settings()
+        if update is None:
+            if manual:
+                messagebox.showinfo(APP_NAME, f"You have the latest version ({__version__}).", parent=self.root)
+            return
+        if update.version == self.settings.skipped_version and not manual:
+            return
+        from .ui.update_window import UpdateWindow
+        if not manual:
+            self.show_window()
+        UpdateWindow(self, update)
 
     def _refresh_integration(self) -> None:
         if not getattr(sys, "frozen", False):

@@ -8,6 +8,7 @@
 - Reads the JavaScript inside Electron apps (app.asar)
 - Opens 7z and RAR archives, including password-protected detection and archives inside archives
 - Optional MalwareBazaar fingerprint lookups
+- Automatic updates: Barry checks for a new version once a day and, with your OK, downloads it, checks its fingerprint and installs it (installed Windows copies; portable and Mac copies get the right download)
 - Fixed a rule that could take many minutes on large minified JavaScript files
 - Fewer false alarms: .NET framework files, placeholder Discord tokens, and file-type lists that mention curl
 
