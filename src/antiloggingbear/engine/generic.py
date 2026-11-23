@@ -73,6 +73,8 @@ def sniff(name: str, data: bytes) -> str:
         return "elf"
     if head.startswith(b"\x1bLua"):
         return "script:lua-bytecode"
+    if ext == "asar" and head[:4] == b"\x04\x00\x00\x00":
+        return "asar"
     if ext in ("url", "scf"):
         return "shortcut"
     if ext == "lnk":

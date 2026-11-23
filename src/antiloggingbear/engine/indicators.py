@@ -24,8 +24,10 @@ SMTP = re.compile(r"\bsmtp\.(?:gmail|mail|yandex|office365|outlook|zoho)\.\w+|\b
 DISCORD_TOKEN = re.compile(r"dQw4w9WgXcQ:|[\w-]{24}\.[\w-]{6}\.[\w-]{27}")
 
 BROWSER_SECRETS = re.compile(
-    r"\\(?:Login Data|Web Data|Local State|Cookies)\b|logins\.json|key4\.db|cookies\.sqlite"
-    r"|\\Local Storage\\leveldb|wallet\.dat|\\Exodus\\|\\Electrum\\|\\Telegram Desktop\\tdata",
+    r"\\+(?:Login Data|Web Data|Local State|Cookies)\b|/(?:Login Data|Local State)\b"
+    r"|logins\.json|key4\.db|cookies\.sqlite|wallet\.dat"
+    r"|Local Storage(?:[\\/]+|['\"]\s*,\s*['\"])leveldb"
+    r"|[\\/]+(?:Exodus|Electrum)[\\/]+|Telegram Desktop(?:[\\/]+|['\"]\s*,\s*['\"])tdata",
     re.I,
 )
 KEYLOG_MARKERS = re.compile(
@@ -41,6 +43,14 @@ DEFENDER_TAMPER = re.compile(
     r"|wevtutil(?:\.exe)?\s+cl\b",
     re.I,
 )
+
+
+def discord_token(text: str) -> str:
+    for match in DISCORD_TOKEN.finditer(text):
+        token = match.group()
+        if token.startswith("dQw4w9WgXcQ:") or len(set(token.replace(".", "").lower())) > 6:
+            return token
+    return ""
 
 
 def extract_strings(data: bytes, limit: int = MAX_STRING_SCAN) -> str:

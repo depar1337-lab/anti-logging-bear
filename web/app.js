@@ -283,6 +283,12 @@ function renderFile(file) {
     rel: "noopener noreferrer",
     text: "VirusTotal",
   });
+  const bazaar = el("a", {
+    href: `https://bazaar.abuse.ch/browse.php?search=sha256%3A${file.sha256}`,
+    target: "_blank",
+    rel: "noopener noreferrer",
+    text: "MalwareBazaar",
+  });
   const copy = el("button", { type: "button", class: "link-button", text: "Copy SHA-256" });
   copy.addEventListener("click", async () => {
     try {
@@ -297,7 +303,7 @@ function renderFile(file) {
     el("div", { class: "file-path", text: file.path }),
     el("div", { class: "file-meta", text: `${file.kind} · ${formatSize(file.size)}` }),
     el("code", { class: "hash", text: file.sha256 }),
-    el("div", { class: "file-actions" }, lookup, copy));
+    el("div", { class: "file-actions" }, lookup, bazaar, copy));
 }
 
 function setDetails(open) {

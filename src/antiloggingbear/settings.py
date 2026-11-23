@@ -28,10 +28,14 @@ class Settings:
     max_unpacked_mb: int = 1024
     use_yara: bool = True
     custom_rules_dir: str = ""
+    update_rules: bool = True
+    rules_checked: str = ""
     use_antivirus: bool = True
 
     vt_api_key: str = ""
     vt_max_lookups: int = 4
+    mb_api_key: str = ""
+    mb_max_lookups: int = 25
 
     start_at_login: bool = False
     context_menu: bool = False
@@ -49,9 +53,12 @@ class Settings:
             strict=self.strict,
             use_yara=self.use_yara,
             custom_rules_dir=self.custom_rules_dir,
+            rules_dir=str(paths.config_dir() / "rules"),
             use_antivirus=self.use_antivirus,
             vt_api_key=self.vt_api_key,
             vt_max_lookups=self.vt_max_lookups,
+            mb_api_key=self.mb_api_key,
+            mb_max_lookups=self.mb_max_lookups,
         )
 
 

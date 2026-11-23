@@ -5,3 +5,4 @@ pcodedmp==1.2.6
 LnkParse3==1.6.0
 pyparsing==3.2.3
 colorclass==2.2.2
+dnfile==0.18.0

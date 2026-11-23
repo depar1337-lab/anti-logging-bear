@@ -23,11 +23,15 @@ pyodide.FS.mkdirTree("/project/tests");
 for (const name of fs.readdirSync(path.join(root, "tests")).filter((file) => file.endsWith(".py"))) {
   pyodide.FS.writeFile(`/project/tests/${name}`, fs.readFileSync(path.join(root, "tests", name)));
 }
+pyodide.FS.mkdirTree("/project/tests/fixtures");
+for (const name of fs.readdirSync(path.join(root, "tests", "fixtures"))) {
+  pyodide.FS.writeFile(`/project/tests/fixtures/${name}`, fs.readFileSync(path.join(root, "tests", "fixtures", name)));
+}
 
 const status = pyodide.runPython(`
 import os, sys, pytest
 os.chdir("/project")
 sys.path.insert(0, "/project/tests")
-int(pytest.main(["-q", "-p", "no:cacheprovider", "tests/test_scanner.py", "tests/test_web.py"]))
+int(pytest.main(["-q", "-p", "no:cacheprovider", "tests/test_scanner.py", "tests/test_web.py", "tests/test_unpacking.py"]))
 `);
 process.exit(status);

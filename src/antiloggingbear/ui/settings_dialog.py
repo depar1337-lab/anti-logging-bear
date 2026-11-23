@@ -13,12 +13,13 @@ from .. import APP_NAME
 from ..engine import antivirus
 from ..engine.yara_rules import shared_engine
 from ..settings import Settings
-from ..system import integration
+from ..system import integration, paths
 
 if TYPE_CHECKING:
     from ..app import Application
 
 VT_SIGNUP = "https://www.virustotal.com/gui/join-us"
+MB_SIGNUP = "https://auth.abuse.ch/"
 
 
 class SettingsDialog(tk.Toplevel):
@@ -107,7 +108,8 @@ class SettingsDialog(tk.Toplevel):
         ttk.Radiobutton(page, text="Strict - also warn about medium-risk signs (more false alarms)",
                         variable=strict, value=True).grid(row=2, column=0, sticky="w")
 
-        self._check(page, 3, "use_yara", "Use YARA pattern rules", shared_engine(self.draft.custom_rules_dir).status)
+        self._check(page, 3, "use_yara", "Use YARA pattern rules", shared_engine(
+            self.draft.custom_rules_dir, str(paths.config_dir() / "rules")).status)
         ttk.Label(page, text="Extra YARA rules folder (optional)").grid(row=5, column=0, sticky="w", pady=(12, 4))
         rules = ttk.Frame(page)
         rules.grid(row=6, column=0, sticky="ew")
@@ -126,6 +128,8 @@ class SettingsDialog(tk.Toplevel):
         ttk.Spinbox(sizes, from_=16, to=8192, increment=64, width=7,
                     textvariable=self._var("max_file_mb", tk.IntVar)).pack(side="left", padx=6)
         ttk.Label(sizes, text="MB").pack(side="left")
+        self._check(page, 10, "update_rules", "Download new community rules every week",
+                    "Barry fetches the latest YARA Forge rules from GitHub. Nothing about you or your files is sent.")
 
     def _online_tab(self) -> None:
         page = self._page("Online check")
@@ -148,8 +152,21 @@ class SettingsDialog(tk.Toplevel):
         ttk.Spinbox(lookups, from_=1, to=50, width=5,
                     textvariable=self._var("vt_max_lookups", tk.IntVar)).pack(side="left", padx=6)
         ttk.Label(lookups, text="files per scan (riskiest first; free keys allow 4 a minute)").pack(side="left")
-        ttk.Label(page, text="The key is stored in your user profile's settings file.",
-                  style="Muted.TLabel").grid(row=4, column=0, columnspan=3, sticky="w", pady=(10, 0))
+        ttk.Label(page, wraplength=540, justify="left", text=(
+            "With a free abuse.ch Auth-Key, Barry also checks fingerprints against MalwareBazaar, a database "
+            "of confirmed malware. A match there means the exact file is known malware.")
+        ).grid(row=4, column=0, columnspan=3, sticky="w", pady=(18, 0))
+        ttk.Label(page, text="MalwareBazaar Auth-Key").grid(row=5, column=0, sticky="w", pady=(10, 4))
+        self.mb_key = tk.StringVar(value=self.draft.mb_api_key)
+        mb_entry = ttk.Entry(page, textvariable=self.mb_key, show="•")
+        mb_entry.grid(row=6, column=0, sticky="ew")
+        mb_shown = tk.BooleanVar(value=False)
+        ttk.Checkbutton(page, text="Show", variable=mb_shown,
+                        command=lambda: mb_entry.configure(show="" if mb_shown.get() else "•")).grid(
+            row=6, column=1, padx=8)
+        ttk.Button(page, text="Get a free key", command=lambda: webbrowser.open(MB_SIGNUP)).grid(row=6, column=2)
+        ttk.Label(page, text="Keys are stored in your user profile's settings file.",
+                  style="Muted.TLabel").grid(row=7, column=0, columnspan=3, sticky="w", pady=(10, 0))
 
     def _system_tab(self) -> None:
         page = self._page("System")
@@ -257,6 +274,7 @@ class SettingsDialog(tk.Toplevel):
         new.exclusions = [p.strip() for p in self.exclusions.get().split(",") if p.strip()]
         new.custom_rules_dir = self.rules_dir.get().strip()
         new.vt_api_key = self.vt_key.get().strip()
+        new.mb_api_key = self.mb_key.get().strip()
         new.max_file_mb = max(16, int(new.max_file_mb))
         new.vt_max_lookups = max(1, min(50, int(new.vt_max_lookups)))
         errors = self.app.apply_settings(new)

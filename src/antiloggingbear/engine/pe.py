@@ -7,6 +7,7 @@ import re
 import pefile
 
 from . import capabilities as cap
+from . import dotnet
 from . import indicators as ioc
 from .findings import Finding, Severity
 from .generic import entropy, extension
@@ -26,6 +27,7 @@ API_CAPABILITIES: dict[str, list[str]] = {
     cap.HOLLOWING: ["ntunmapviewofsection", "zwunmapviewofsection"],
     cap.CREDENTIALS: ["cryptunprotectdata", "credenumeratea", "credenumeratew"],
 }
+PYINSTALLER_MAGIC = b"MEI\x0c\x0b\x0a\x0b\x0e"
 _API_LOOKUP = {api: name for name, apis in API_CAPABILITIES.items() for api in apis}
 _DOWNLOAD_API = {"urldownloadtofilea", "urldownloadtofilew"}
 _EXEC_API = {"shellexecutea", "shellexecutew", "shellexecuteexa", "shellexecuteexw", "winexec",
@@ -50,7 +52,7 @@ _NET_STRING_MAP = {
 }
 
 
-def analyze_pe(path: str, data: bytes) -> list[Finding]:
+def analyze_pe(path: str, data: bytes, children: list | None = None, depth: int = 0, walker=None) -> list[Finding]:
     try:
         pe = pefile.PE(data=data, fast_load=True)
         pe.parse_data_directories(directories=[
@@ -90,7 +92,7 @@ def analyze_pe(path: str, data: bytes) -> list[Finding]:
     m = ioc.BROWSER_SECRETS.search(strings)
     if m:
         caps.add(cap.CREDENTIALS, m.group())
-    if ioc.DISCORD_TOKEN.search(strings):
+    if ioc.discord_token(strings):
         caps.add(cap.CREDENTIALS, "Discord token pattern")
     for pattern in (ioc.RUN_KEY, ioc.STARTUP_FOLDER):
         m = pattern.search(strings)
@@ -103,8 +105,13 @@ def analyze_pe(path: str, data: bytes) -> list[Finding]:
     if not (named & _REMOTE_WRITE and named & _REMOTE_THREAD):
         caps.discard(cap.INJECTION)
 
-    findings.extend(cap.assess(path, caps, "pe"))
+    if pe.OPTIONAL_HEADER.DATA_DIRECTORY[14].VirtualAddress != 0:
+        findings.extend(dotnet.analyze(path, data, caps, _API_LOOKUP, children, depth, walker))
+    if not caps.trusted:
+        findings.extend(cap.assess(path, caps, "pe"))
     findings.extend(_structure(path, pe, data, imports))
+    if pyinstaller_like(data):
+        findings = [f for f in findings if f.check not in ("pe.overlay",)]
 
     urls = ioc.find_urls(strings)
     if urls:
@@ -116,6 +123,10 @@ def analyze_pe(path: str, data: bytes) -> list[Finding]:
                                 "This is an ASI mod - your game loads it automatically on start"))
     pe.close()
     return findings
+
+
+def pyinstaller_like(data: bytes) -> bool:
+    return PYINSTALLER_MAGIC in data
 
 
 def _imports(pe: pefile.PE) -> set[str]:
@@ -173,7 +184,7 @@ def _structure(path: str, pe: pefile.PE, data: bytes, imports: set[str]) -> list
         out.append(Finding(path, "pe.unsigned", Severity.INFO, "Program is not digitally signed"))
 
     if dotnet:
-        out.append(Finding(path, "pe.dotnet", Severity.INFO, ".NET program (checked by text and API names)"))
+        out.append(Finding(path, "pe.dotnet", Severity.INFO, ".NET program (Barry read its code references)"))
     if extension(path) == "scr":
         out.append(Finding(path, "pe.screensaver", Severity.MEDIUM,
                            "Screensaver file - these are programs and a classic way to sneak in malware"))

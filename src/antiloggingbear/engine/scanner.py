@@ -8,8 +8,9 @@ import time
 from dataclasses import dataclass, field
 from typing import Callable
 
-from . import antivirus, generic
+from . import antivirus, asar, generic, pyinstaller, rar, sevenzip
 from .archive import MB, ArchiveWalker, Entry, Limits, StopScan
+from .bazaar import MalwareBazaar
 from .findings import FileRecord, Finding, ScanReport, Severity
 from .office import analyze_office
 from .pdf import analyze_pdf
@@ -29,9 +30,12 @@ class ScanOptions:
     strict: bool = False
     use_yara: bool = True
     custom_rules_dir: str = ""
+    rules_dir: str = ""
     use_antivirus: bool = True
     vt_api_key: str = ""
     vt_max_lookups: int = 4
+    mb_api_key: str = ""
+    mb_max_lookups: int = 25
 
 
 class ScanCancelled(Exception):
@@ -52,6 +56,7 @@ class Scanner:
         self._cancelled = cancelled
         self._yara = None
         self._risk: dict[str, Severity] = {}
+        self._walker = ArchiveWalker(options.limits)
 
     def run(self, path: str) -> ScanReport:
         started = time.monotonic()
@@ -59,56 +64,55 @@ class Scanner:
         name = os.path.basename(path)
 
         if self.options.use_yara:
-            self._yara = shared_engine(self.options.custom_rules_dir)
+            self._yara = shared_engine(self.options.custom_rules_dir, self.options.rules_dir)
             report.engines["YARA"] = self._yara.status
         else:
             report.engines["YARA"] = "off"
 
         size = os.path.getsize(path)
         report.extend(generic.check_name(name))
-        if size > self.options.max_file_bytes:
-            report.add(Finding(name, "file.too-large", Severity.MEDIUM,
-                               f"File is larger than the scan limit ({size / MB:.0f} MB)"))
-        else:
-            with open(path, "rb") as fh:
-                head = fh.read(8)
-            if head.startswith(b"PK") and generic.extension(name) not in generic.OFFICE_EXTS:
-                self._scan_archive(path, name, report)
+        try:
+            if size > self.options.max_file_bytes:
+                report.add(Finding(name, "file.too-large", Severity.MEDIUM,
+                                   f"File is larger than the scan limit ({size / MB:.0f} MB)"))
+            elif self._is_plain_zip(path, name):
+                report.files.append(FileRecord(name, size, _sha256_file(path), "zip"))
+                for entry in self._walker.walk(path, "", 0):
+                    self._scan_tree(entry, report)
             else:
                 with open(path, "rb") as fh:
                     data = fh.read()
-                self._scan_entry(Entry(path=name, data=data, depth=0), report, inspect_names=False)
+                self._scan_tree(Entry(path=name, data=data, depth=0), report, inspect_names=False)
+        except StopScan:
+            pass
+        finally:
+            report.extend(self._walker.findings)
 
         self._check_cancel()
         self._run_antivirus(path, report)
         self._run_reputation(path, report)
+        self._run_bazaar(report)
         report.duration = time.monotonic() - started
         return report
 
-    def _scan_archive(self, path: str, name: str, report: ScanReport) -> None:
-        walker = ArchiveWalker(self.options.limits)
-        top = FileRecord(name, os.path.getsize(path), _sha256_file(path), "zip")
-        report.files.append(top)
-        try:
-            self._walk(walker, path, "", 0, report)
-        except StopScan:
-            pass
-        finally:
-            report.extend(walker.findings)
+    @staticmethod
+    def _is_plain_zip(path: str, name: str) -> bool:
+        with open(path, "rb") as fh:
+            head = fh.read(8)
+        return head.startswith(b"PK") and generic.extension(name) not in generic.OFFICE_EXTS
 
-    def _walk(self, walker: ArchiveWalker, source, prefix: str, depth: int, report: ScanReport) -> None:
-        for entry in walker.walk(source, prefix, depth):
-            self._check_cancel()
-            kind = self._scan_entry(entry, report)
-            if kind == "zip":
-                if depth + 1 > self.options.limits.max_depth:
-                    report.add(Finding(entry.path, "archive.deep", Severity.HIGH,
-                                       "Archives nested too deep - Barry stopped looking",
-                                       "Deeply nested zips are used to tire out scanners."))
-                    continue
-                self._walk(walker, entry.data, entry.path + "/", depth + 1, report)
+    def _scan_tree(self, entry: Entry, report: ScanReport, inspect_names: bool = True) -> None:
+        self._check_cancel()
+        kind, children = self._scan_entry(entry, report, inspect_names)
+        for child in _flatten(children):
+            if child.depth > self.options.limits.max_depth:
+                report.add(Finding(entry.path, "archive.deep", Severity.HIGH,
+                                   "Files nested too deep - Barry stopped looking",
+                                   "Deeply nested archives are used to tire out scanners."))
+                break
+            self._scan_tree(child, report)
 
-    def _scan_entry(self, entry: Entry, report: ScanReport, inspect_names: bool = True) -> str:
+    def _scan_entry(self, entry: Entry, report: ScanReport, inspect_names: bool = True):
         data = entry.data
         kind = generic.sniff(entry.path, data)
         sha = hashlib.sha256(data).hexdigest()
@@ -116,14 +120,12 @@ class Scanner:
         self._progress(entry.path)
 
         findings: list[Finding] = []
+        children: list = []
         if inspect_names:
             findings.extend(generic.check_name(entry.path))
         findings.extend(generic.check_content(entry.path, kind, data))
-        findings.extend(self._analyze(entry.path, kind, data))
-        if kind in ("rar", "7z", "gzip"):
-            findings.append(Finding(entry.path, "archive.unsupported", Severity.HIGH,
-                                    f"Contains a {kind.upper()} archive Barry can't open - check it separately"))
-        if self._yara is not None and kind != "zip":
+        findings.extend(self._analyze(entry, kind, children))
+        if self._yara is not None and kind not in ("zip", "7z", "rar"):
             findings.extend(self._yara.match(entry.path, data))
 
         report.extend(findings)
@@ -131,11 +133,29 @@ class Scanner:
         if generic.extension(entry.path) in generic.EXECUTABLE_EXTS or kind in ("pe", "office", "pdf"):
             worst = max(worst, Severity.LOW)
         self._risk[sha] = max(self._risk.get(sha, Severity.INFO), worst)
-        return kind
+        return kind, children
 
-    def _analyze(self, path: str, kind: str, data: bytes) -> list[Finding]:
+    def _analyze(self, entry: Entry, kind: str, children: list) -> list[Finding]:
+        path, data, depth = entry.path, entry.data, entry.depth
+        if kind == "zip":
+            children.append(self._walker.walk(data, path + "/", depth + 1))
+            return []
+        if kind == "7z":
+            found, inner = sevenzip.walk(self._walker, path, data, depth + 1)
+            children.append(inner)
+            return found
+        if kind == "rar":
+            found, inner = rar.walk(self._walker, path, data, depth + 1)
+            children.append(inner)
+            return found
         if kind == "pe":
-            return analyze_pe(path, data)
+            found = analyze_pe(path, data, children, depth + 1, self._walker)
+            found.extend(pyinstaller.analyze(path, data, children, depth + 1, self._walker))
+            return found
+        if kind == "asar":
+            found, inner = asar.walk(self._walker, path, data, depth + 1)
+            children.append(inner)
+            return found
         if kind.startswith("script:") or kind == "cleo":
             return analyze_script(path, kind, data)
         if kind == "office":
@@ -148,6 +168,9 @@ class Scanner:
             return analyze_url_shortcut(path, data)
         if kind == "text":
             return analyze_script(path, "script:text", data)
+        if kind == "gzip":
+            return [Finding(path, "archive.unsupported", Severity.MEDIUM,
+                            "Contains a GZIP archive Barry can't open - check it separately")]
         return []
 
     def _run_antivirus(self, path: str, report: ScanReport) -> None:
@@ -178,9 +201,33 @@ class Scanner:
         report.engines["VirusTotal"] = status
         report.extend(findings)
 
+    def _run_bazaar(self, report: ScanReport) -> None:
+        if not self.options.mb_api_key:
+            report.engines["MalwareBazaar"] = "off (no Auth-Key)"
+            return
+        self._progress("Checking file fingerprints with MalwareBazaar...")
+        ranked = sorted(report.files, key=lambda r: (-self._risk.get(r.sha256, Severity.LOW), r.path))
+        seen, queue = set(), []
+        for rec in ranked:
+            if rec.sha256 and rec.sha256 not in seen and rec.kind not in ("text", "data"):
+                seen.add(rec.sha256)
+                queue.append((rec.path, rec.sha256))
+        status, findings = MalwareBazaar(self.options.mb_api_key, self.options.mb_max_lookups).lookup_many(
+            queue, self._cancelled)
+        report.engines["MalwareBazaar"] = status
+        report.extend(findings)
+
     def _check_cancel(self) -> None:
         if self._cancelled():
             raise ScanCancelled
+
+
+def _flatten(items: list):
+    for item in items:
+        if isinstance(item, Entry):
+            yield item
+        else:
+            yield from item
 
 
 def _sha256_file(path: str) -> str:

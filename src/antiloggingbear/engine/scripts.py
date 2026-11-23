@@ -49,6 +49,8 @@ CAPABILITY_RULES: list[tuple[str, Pattern[str], str]] = [
 
     (cap.CREDENTIALS, _rx(r"CryptUnprotectData|win32crypt|ProtectedData\]::Unprotect|\bbrowser_cookie3\b"),
      "decrypts saved browser data"),
+    (cap.CREDENTIALS, _rx(r"discord_desktop_core|\b(?:win-dpapi|@primno/dpapi|node-dpapi)\b"),
+     "tampers with the Discord app or decrypts saved passwords"),
     (cap.DIALOG_INPUT, _rx(r"sampGetCurrentDialogEditboxText|onSendDialogResponse"),
      "reads SA-MP dialog input (where passwords are typed)"),
 
@@ -80,7 +82,8 @@ CAPABILITY_RULES: list[tuple[str, Pattern[str], str]] = [
                             r"|mshta(?:\.exe)?\s+[\"']?(?:https?|vbscript|javascript):"
                             r"|regsvr32(?:\.exe)?\s[^\n]*/i:https?|rundll32(?:\.exe)?\s[^\n]*javascript:"),
      "abuses a Windows tool to download code"),
-    (cap.DOWNLOAD_EXEC, _rx(r"\b(?:curl|wget)\b[^\n]*(?:-o|-O|--output)\s*\S+[^\n]*(?:&&|;|\n)\s*(?:start\b|call\b|\.\\|\./|chmod\s+\+x|open\s)"),
+    (cap.DOWNLOAD_EXEC, _rx(r"\b(?:curl|wget)(?:\.exe)?\s[^\n]{0,200}?\s(?:-o|-O|--output)\s+\S+[^\n]{0,200}?"
+                            r"(?:&&|;|\n)\s*(?:start\b|call\b|\.\\|\./|chmod\s+\+x|open\s)"),
      "downloads a file and starts it"),
     (cap.DOWNLOAD_EXEC, _rx(r"urlretrieve\([^)]*\)[\s\S]{0,300}?(?:os\.startfile|subprocess|os\.system|os\.popen)"),
      "downloads a file and starts it (Python)"),
@@ -162,8 +165,14 @@ def analyze_script(path: str, kind: str, data: bytes) -> list[Finding]:
     return _scan_text(path, text, lang, decoded_depth=0)
 
 
-def _scan_text(path: str, text: str, lang: str, decoded_depth: int) -> list[Finding]:
-    caps = cap.Capabilities()
+def analyze_text(path: str, text: str, lang: str, extra: cap.Capabilities | None = None,
+                 prefix: str = "script") -> list[Finding]:
+    return _scan_text(path, text, lang, decoded_depth=1, extra=extra, prefix=prefix)
+
+
+def _scan_text(path: str, text: str, lang: str, decoded_depth: int, extra: cap.Capabilities | None = None,
+               prefix: str = "script") -> list[Finding]:
+    caps = extra if extra is not None else cap.Capabilities()
     for name, pattern, label in CAPABILITY_RULES:
         m = pattern.search(text)
         if m:
@@ -174,10 +183,12 @@ def _scan_text(path: str, text: str, lang: str, decoded_depth: int) -> list[Find
     marker = ioc.KEYLOG_MARKERS.search(text)
     if marker:
         caps.add(cap.KEYLOG_MARKER, marker.group())
-    for pattern, label in ((ioc.BROWSER_SECRETS, "browser data path"), (ioc.DISCORD_TOKEN, "Discord token pattern")):
-        m = pattern.search(text)
-        if m:
-            caps.add(cap.CREDENTIALS, f"{label} ({_snippet(m.group())})")
+    m = ioc.BROWSER_SECRETS.search(text)
+    if m:
+        caps.add(cap.CREDENTIALS, f"browser data path ({_snippet(m.group())})")
+    token = ioc.discord_token(text)
+    if token:
+        caps.add(cap.CREDENTIALS, f"Discord token pattern ({_snippet(token)})")
     for pattern in (ioc.RUN_KEY, ioc.STARTUP_FOLDER):
         m = pattern.search(text)
         if m:
@@ -186,7 +197,7 @@ def _scan_text(path: str, text: str, lang: str, decoded_depth: int) -> list[Find
     if m:
         caps.add(cap.DEFENDER_TAMPER, _snippet(m.group()))
 
-    findings = cap.assess(path, caps, "script")
+    findings = cap.assess(path, caps, prefix)
     for check, severity, pattern, title in DIRECT_RULES:
         m = pattern.search(text)
         if m:

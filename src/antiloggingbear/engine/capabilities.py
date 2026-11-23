@@ -25,6 +25,7 @@ DIALOG_INPUT = "dialog_input"
 class Capabilities:
     def __init__(self) -> None:
         self._evidence: dict[str, list[str]] = {}
+        self.trusted = False
 
     def add(self, cap: str, evidence: str) -> None:
         bucket = self._evidence.setdefault(cap, [])
@@ -34,6 +35,9 @@ class Capabilities:
     def add_all(self, cap: str, evidence: Iterable[str]) -> None:
         for item in evidence:
             self.add(cap, item)
+
+    def mark_trusted(self) -> None:
+        self.trusted = True
 
     def discard(self, cap: str) -> None:
         self._evidence.pop(cap, None)

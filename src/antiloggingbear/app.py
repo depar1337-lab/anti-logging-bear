@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import datetime as dt
 import os
 import queue
 import sys
@@ -10,10 +11,10 @@ import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
-from . import APP_NAME
+from . import APP_NAME, rule_updates
 from . import report as fmt
 from . import settings as config
-from .engine import antivirus
+from .engine import antivirus, yara_rules
 from .engine.findings import ScanReport, Verdict
 from .engine.scanner import ScanCancelled, scan_path
 from .history import History
@@ -90,6 +91,7 @@ class Application:
         self._refresh_integration()
         self._restart_watcher()
         self._refresh_engine_status()
+        threading.Thread(target=self._prepare_rules, name="rules", daemon=True).start()
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
         self.root.after(100, self._pump)
         for path in initial:
@@ -98,6 +100,29 @@ class Application:
     def run(self) -> int:
         self.root.mainloop()
         return 0
+
+    def _prepare_rules(self) -> None:
+        settings = self.settings
+        if not settings.use_yara:
+            return
+        data = paths.config_dir() / "rules"
+        engine = yara_rules.shared_engine(settings.custom_rules_dir, str(data))
+        self.post(self._refresh_engine_status)
+        if not (settings.update_rules and rule_updates.due(settings.rules_checked)):
+            return
+        try:
+            release = rule_updates.update(data, engine.release)
+        except Exception:
+            return
+        self.post(lambda: self._rules_updated(release))
+
+    def _rules_updated(self, release) -> None:
+        self.settings.rules_checked = dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+        self.save_settings()
+        if release:
+            yara_rules.reset_shared()
+            threading.Thread(target=self._prepare_rules, name="rules", daemon=True).start()
+            self.window.set_status("Barry downloaded the latest community rules.")
 
     def _refresh_integration(self) -> None:
         if not getattr(sys, "frozen", False):
@@ -355,8 +380,9 @@ class Application:
     def _refresh_engine_status(self) -> None:
         s = self.settings
         av = (antivirus.available_engine() or "none found") if s.use_antivirus else "off"
-        parts = [f"Antivirus: {av}", "YARA: " + ("on" if s.use_yara else "off"),
-                 "VirusTotal: " + ("on" if s.vt_api_key else "off")]
+        parts = [f"Antivirus: {av}", "YARA: " + (yara_rules.summary() if s.use_yara else "off"),
+                 "VirusTotal: " + ("on" if s.vt_api_key else "off"),
+                 "MalwareBazaar: " + ("on" if s.mb_api_key else "off")]
         self.window.set_engine_status("   |   ".join(parts))
 
     def _on_instance_message(self, message: dict) -> None:

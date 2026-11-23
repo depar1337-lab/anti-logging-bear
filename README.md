@@ -12,11 +12,12 @@ Built for the stuff people actually download: game mods (ASI plugins, MoonLoader
 
 | Area | Checks |
 |---|---|
-| **Archives** | Zip bombs, password-protected files, paths that escape the unzip folder, nested archives, fake extensions (`invoice.pdf.exe`), hidden right-to-left characters, archive formats he can't open |
+| **Archives** | Reads zip, 7z and RAR straight from memory, including archives inside archives. Zip bombs, password-protected files, paths that escape the unzip folder, fake extensions (`invoice.pdf.exe`), hidden right-to-left characters |
+| **Packed programs** | Unpacks PyInstaller programs and reads their Python code, reads .NET programs' imports, classes and embedded resources (and spots ConfuserEx and other obfuscators), and reads the JavaScript inside Electron apps (`app.asar`). This is where most Discord token grabbers and gaming stealers hide |
 | **Programs** (`.exe` `.dll` `.asi` `.scr`) | Keyboard hooks and key polling, combined with webhook/Telegram/SMTP upload, keylogger log formatting (`[BACKSPACE]`), clipboard and screenshot capture, code injection and process hollowing, browser password and Discord token theft, start-up persistence, packers and encrypted code |
 | **Scripts and mods** (`.ps1` `.bat` `.vbs` `.js` `.hta` `.py` `.lua` `.cs`) | Download-and-run, encoded PowerShell (decoded and re-checked), obfuscation, antivirus tampering, Python/Lua/PowerShell keyloggers, SA-MP dialog password grabbing |
 | **Documents and shortcuts** | Auto-run Office macros, remote templates, DDE, PDF JavaScript and launch actions, `.lnk` shortcuts that secretly run PowerShell or `cmd` |
-| **Extra engines** | Bundled YARA rules, a second opinion from Microsoft Defender (or ClamAV on macOS), and optional VirusTotal hash lookups |
+| **Extra engines** | Over 10,000 community YARA rules from [YARA Forge](https://github.com/YARAHQ/yara-forge), refreshed weekly, plus Barry's own rules. A second opinion from Microsoft Defender (or ClamAV on macOS), and optional VirusTotal and MalwareBazaar fingerprint lookups |
 
 Barry scores capabilities together rather than flagging single API calls. A mod that reads keys for hotkeys is fine. One that reads keys **and** posts to a Discord webhook is a keylogger.
 
@@ -88,11 +89,11 @@ Run `antiloggingbear --help` for every option.
 
 ## Privacy
 
-Everything runs on your computer. The only time anything leaves it is when you add a VirusTotal key, and even then Barry sends only SHA-256 fingerprints, never files or file names. The web app works the same way: files are read inside the browser, and the only thing sent anywhere is a fingerprint, when you tap a VirusTotal link.
+Everything runs on your computer. Files only leave it as SHA-256 fingerprints, and only if you add a VirusTotal or MalwareBazaar key; file names are never sent. Once a week Barry downloads the latest community YARA rules from GitHub, which sends nothing about you or your files (you can turn this off in Settings). The web app works the same way: files are read inside the browser, and the only thing sent anywhere is a fingerprint, when you tap a VirusTotal link.
 
 ## Limits
 
-No scanner can prove a file is safe. Barry reads files without running them, so brand-new malware that is heavily packed or encrypted can hide its behaviour. When Barry can't see inside something (a passworded zip, a packed program, a RAR file), he says so and marks the download **Suspicious** rather than clean. "No threats found" means nothing suspicious was spotted. Only run software from people you trust.
+No scanner can prove a file is safe. RAR archives are read with tools already on your computer: Windows 10 and 11's built-in `tar`, macOS's `tar`, or 7-Zip or WinRAR if installed. On Windows 7 without them, Barry can only read the file names. The web app reads 7z and RAR only on the desktop versions. Barry reads files without running them, so brand-new malware that is heavily packed or encrypted can hide its behaviour. When Barry can't see inside something (a passworded archive, a packed program, a RAR format your system can't read), he says so and marks the download **Suspicious** rather than clean. "No threats found" means nothing suspicious was spotted. Only run software from people you trust.
 
 ## Building from source
 
@@ -100,9 +101,12 @@ No scanner can prove a file is safe. Barry reads files without running them, so 
 python -m venv .venv
 .venv\Scripts\activate            # source .venv/bin/activate on macOS
 pip install -e ".[dev,yara]"
+python tools/fetch_rules.py        # bundles the YARA Forge community rules (checksum-pinned)
 python -m pytest
 python -m antiloggingbear
 ```
+
+The community rules are stored compressed (`forge.bin`) and only ever decompressed in memory. Plain-text rule files are full of malware strings, so antivirus products flag them as malware themselves.
 
 Release builds come from GitHub Actions (`.github/workflows/build.yml`). The Windows build uses Python 3.8, the last version that supports Windows 7, with the pinned packages in `packaging/requirements-win7.txt`. The macOS build produces an app bundle and a disk image. To build locally:
 
@@ -139,3 +143,5 @@ packaging/    PyInstaller spec, Inno Setup script, pinned Windows 7 requirements
 ## Licence
 
 MIT. Made by Priest.
+
+Community YARA rules come from [YARA Forge](https://github.com/YARAHQ/yara-forge), which collects rules from many public sources. Each rule keeps its author, reference and licence in its metadata. The sample RAR archives in `tests/fixtures` come from [rarfile](https://github.com/markokr/rarfile) (ISC licence, see `rarfile-LICENSE.txt`).

@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.0
+
+- Over 10,000 community YARA rules from YARA Forge, downloaded weekly and kept compressed so antivirus doesn't mistake them for malware
+- Looks inside PyInstaller programs and reads their Python code
+- Reads .NET programs' imports, classes and embedded resources, and spots obfuscators like ConfuserEx
+- Reads the JavaScript inside Electron apps (app.asar)
+- Opens 7z and RAR archives, including password-protected detection and archives inside archives
+- Optional MalwareBazaar fingerprint lookups
+- Fixed a rule that could take many minutes on large minified JavaScript files
+- Fewer false alarms: .NET framework files, placeholder Discord tokens, and file-type lists that mention curl
+
 ## 1.1.0
 
 - The program is now called Barry Bear. Settings, history and quarantined files carry over from Anti-Logging Bear

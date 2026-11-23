@@ -24,6 +24,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-av", action="store_true", help="skip the system antivirus check")
     parser.add_argument("--no-yara", action="store_true", help="skip YARA rules")
     parser.add_argument("--vt-key", metavar="KEY", help="VirusTotal API key (hash lookups only)")
+    parser.add_argument("--mb-key", metavar="KEY", help="MalwareBazaar Auth-Key (hash lookups only)")
     parser.add_argument("--version", action="version", version=f"{APP_NAME} {__version__}")
     return parser
 
@@ -48,6 +49,8 @@ def _run_cli(args: argparse.Namespace) -> int:
     options.use_yara = options.use_yara and not args.no_yara
     if args.vt_key:
         options.vt_api_key = args.vt_key
+    if args.mb_key:
+        options.mb_api_key = args.mb_key
 
     worst = 0
     for path in args.paths:

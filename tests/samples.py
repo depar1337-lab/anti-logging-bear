@@ -120,3 +120,57 @@ def make_pdf(body: bytes) -> bytes:
 
 def encoded_command(script: str) -> str:
     return base64.b64encode(script.encode("utf-16-le")).decode("ascii")
+
+
+def make_pyinstaller(scripts: dict, modules: dict, encrypt: tuple = ()) -> bytes:
+    import marshal
+    import zlib
+
+    def code(source: str) -> bytes:
+        return marshal.dumps(compile(source, "<sample>", "exec"))
+
+    pyz_body = b""
+    toc = []
+    header = 12
+    for name, source in modules.items():
+        blob = b"\x00garbled" * 8 if name in encrypt else zlib.compress(code(source))
+        toc.append((name, (0, header + len(pyz_body), len(blob))))
+        pyz_body += blob
+    pyz = b"PYZ\x00" + b"\x55\x0d\x0d\x0a" + struct.pack("!i", header + len(pyz_body)) + pyz_body
+    pyz += marshal.dumps(toc)
+
+    entries = [(name, zlib.compress(code(source)), b"s") for name, source in scripts.items()]
+    entries.append(("PYZ-00.pyz", pyz, b"z"))
+    package = b""
+    toc_bytes = b""
+    for name, blob, kind in entries:
+        compressed = 1 if kind == b"s" else 0
+        raw_name = name.encode() + b"\x00"
+        raw_name += b"\x00" * (-(18 + len(raw_name)) % 16)
+        toc_bytes += struct.pack("!iIIIBc", 18 + len(raw_name), len(package), len(blob), len(blob),
+                                 compressed, kind) + raw_name
+        package += blob
+    toc_offset = len(package)
+    package += toc_bytes
+    cookie = struct.pack("!8sIIii64s", b"MEI\x0c\x0b\x0a\x0b\x0e", len(package) + 88, toc_offset,
+                         len(toc_bytes), 312, b"python312.dll")
+    return make_pe({"kernel32.dll": ["GetModuleFileNameW", "LoadLibraryW", "GetProcAddress", "CreateProcessW",
+                                     "GetCommandLineW", "ExitProcess", "GetLastError", "SetDllDirectoryW"]},
+                   extra=b"") + package + cookie
+
+
+def make_asar(files: dict) -> bytes:
+    import json
+    tree: dict = {"files": {}}
+    body = b""
+    for path, content in files.items():
+        node = tree
+        parts = path.split("/")
+        for part in parts[:-1]:
+            node = node["files"].setdefault(part, {"files": {}})
+        node["files"][parts[-1]] = {"size": len(content), "offset": str(len(body))}
+        body += content
+    header = json.dumps(tree).encode()
+    padded = header + b"\x00" * (-len(header) % 4)
+    pickle = struct.pack("<II", len(padded) + 4, len(header)) + padded
+    return struct.pack("<II", 4, len(pickle)) + pickle + body
