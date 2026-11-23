@@ -38,12 +38,14 @@ def _configure(rarfile) -> None:
         rarfile.tool_setup(force=True)
 
 
-def _uses_bsdtar(rarfile) -> bool:
-    setup = getattr(rarfile, "CURRENT_SETUP", None)
-    try:
-        return setup is not None and setup.setup["open_cmd"][0] == "BSDTAR_TOOL"
-    except (AttributeError, KeyError, IndexError, TypeError):
-        return False
+def _system_tar() -> str:
+    if sys.platform == "win32":
+        candidates = [os.path.join(os.environ.get("SYSTEMROOT", r"C:\Windows"), "System32", "tar.exe")]
+    elif sys.platform == "darwin":
+        candidates = ["/usr/bin/bsdtar", "/usr/bin/tar"]
+    else:
+        candidates = [shutil.which("bsdtar") or ""]
+    return next((tool for tool in candidates if tool and os.path.isfile(tool)), "")
 
 
 def walk(walker, path: str, data: bytes, depth: int):
@@ -81,7 +83,8 @@ def _entries(walker, archive, path: str, data: bytes, depth: int, rarfile):
             if walker.admit(child, int(info.file_size or 0), int(info.compress_size or 0), info.needs_password()):
                 wanted.add(info.filename)
 
-        contents = _stream_with_tar(rarfile.BSDTAR_TOOL, data, members, walker) if _uses_bsdtar(rarfile) else None
+        tar = _system_tar()
+        contents = _stream_with_tar(tar, data, members, walker) if tar and members else None
         if contents is not None:
             for info in members:
                 if info.filename in wanted and info.filename in contents:
@@ -101,11 +104,7 @@ def _entries(walker, archive, path: str, data: bytes, depth: int, rarfile):
                     blind.append(child)
                     continue
                 except rarfile.BadRarFile:
-                    if _uses_bsdtar(rarfile):
-                        blind.append(child)
-                        continue
-                    walker.findings.append(Finding(child, "archive.corrupt", Severity.MEDIUM,
-                                                   "File inside the RAR archive is damaged"))
+                    blind.append(child)
                     continue
                 except Exception as exc:
                     walker.findings.append(Finding(child, "archive.corrupt", Severity.MEDIUM,

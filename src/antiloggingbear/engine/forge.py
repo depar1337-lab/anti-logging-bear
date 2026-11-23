@@ -17,6 +17,7 @@ BUNDLE_NAME = "forge.bin"
 _RULE_START = re.compile(r"(?m)^(?=(?:private |global )*rule \w+)")
 _RULE_NAME = re.compile(r"(?:private |global )*rule (\w+)")
 _WORD = re.compile(r"\w+")
+_UNSUPPORTED = re.compile(r'(?:invalid field name|undefined identifier|unknown module|invalid argument)\s*"([\w.]+)"')
 _FEATURE_PROBES = {
     "pe.number_of_signatures": 'import "pe" rule probe { condition: pe.number_of_signatures > 0 }',
     "pe.signatures": 'import "pe" rule probe { condition: pe.signatures[0].issuer == "" }',
@@ -90,17 +91,26 @@ def compile_bundle(yara, bundle: Bundle, cache_dir: Path | None):
     head, blocks = blocks[0], blocks[1:]
     kept = _without_dependents([b for b in blocks if not any(feature in b for feature in missing)], blocks)
     rules = None
-    for _attempt in range(200):
+    last_error = ""
+    for _attempt in range(300):
         try:
             rules = yara.compile(source=head + "".join(kept))
             break
         except yara.SyntaxError as exc:
-            index = _block_at_line(head, kept, str(exc))
+            last_error = str(exc)
+            culprit = _UNSUPPORTED.search(last_error)
+            if culprit:
+                name = culprit.group(1)
+                fewer = _without_dependents([b for b in kept if name not in _condition(b)], blocks)
+                if len(fewer) < len(kept):
+                    kept = fewer
+                    continue
+            index = _block_at_line(head, kept, last_error)
             if index is None:
                 raise
             kept.pop(index)
     if rules is None:
-        raise RuntimeError("too many community rules failed to compile")
+        raise RuntimeError("too many community rules failed to compile: " + last_error[:120])
     if cache is not None:
         try:
             cache_dir.mkdir(parents=True, exist_ok=True)
