@@ -14,6 +14,8 @@ from pathlib import Path
 from .findings import Severity
 
 BUNDLE_NAME = "forge.bin"
+COMPILED_NAME = "forge-compiled.bin"
+COMPILED_MAGIC = b"BARRYYC1"
 _RULE_START = re.compile(r"(?m)^(?=(?:private |global )*rule \w+)")
 _RULE_NAME = re.compile(r"(?:private |global )*rule (\w+)")
 _WORD = re.compile(r"\w+")
@@ -74,6 +76,38 @@ def newest_bundle(*paths: Path) -> tuple[Path, Bundle] | None:
         if best is None or bundle.release > best[1].release:
             best = (path, bundle)
     return best
+
+
+def _identity(yara, bundle: Bundle) -> dict:
+    return {"release": bundle.release, "yara": str(getattr(yara, "__version__", "")),
+            "digest": hashlib.sha256(bundle.source.encode("utf-8")).hexdigest()}
+
+
+def precompile(yara, bundle: Bundle) -> bytes:
+    rules, count = compile_bundle(yara, bundle, None)
+    buffer = io.BytesIO()
+    rules.save(file=buffer)
+    header = json.dumps(dict(_identity(yara, bundle), count=count)).encode("utf-8")
+    return COMPILED_MAGIC + len(header).to_bytes(4, "little") + header + zlib.compress(buffer.getvalue(), 9)
+
+
+def load_precompiled(yara, path: Path, bundle: Bundle):
+    try:
+        blob = path.read_bytes()
+    except OSError:
+        return None
+    if not blob.startswith(COMPILED_MAGIC):
+        return None
+    try:
+        size = int.from_bytes(blob[len(COMPILED_MAGIC):len(COMPILED_MAGIC) + 4], "little")
+        start = len(COMPILED_MAGIC) + 4
+        header = json.loads(blob[start:start + size].decode("utf-8"))
+        if any(header.get(key) != value for key, value in _identity(yara, bundle).items()):
+            return None
+        rules = yara.load(file=io.BytesIO(zlib.decompress(blob[start + size:])))
+    except (ValueError, KeyError, zlib.error, yara.Error):
+        return None
+    return rules, int(header.get("count") or 0)
 
 
 def compile_bundle(yara, bundle: Bundle, cache_dir: Path | None):

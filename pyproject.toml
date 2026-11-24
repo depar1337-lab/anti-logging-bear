@@ -33,7 +33,7 @@ antiloggingbear = "antiloggingbear.__main__:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-antiloggingbear = ["assets/*.png", "assets/*.ico", "assets/*.icns", "rules/*.yar", "rules/forge.bin", "bin/*"]
+antiloggingbear = ["assets/*.png", "assets/*.ico", "assets/*.icns", "rules/*.yar", "rules/forge.bin", "rules/forge-compiled.bin", "bin/*"]
 
 [tool.ruff]
 target-version = "py38"

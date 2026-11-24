@@ -41,6 +41,8 @@ def fetch(package: str) -> bytes:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Bundle the YARA Forge community rules")
     parser.add_argument("--out", default=str(OUTPUT))
+    parser.add_argument("--compile", action="store_true",
+                        help="also ship the rules precompiled for the installed yara-python")
     args = parser.parse_args()
     blob = forge.build_bundle(fetch("full"), fetch("core"), RELEASE)
     out = Path(args.out)
@@ -48,6 +50,11 @@ def main() -> None:
     out.write_bytes(blob)
     bundle = forge.read_bundle(blob)
     print(f"YARA Forge {RELEASE}: {bundle.rule_count} rules ({len(bundle.core)} core) -> {out}")
+    if args.compile:
+        import yara
+        compiled = out.with_name(forge.COMPILED_NAME)
+        compiled.write_bytes(forge.precompile(yara, bundle))
+        print(f"precompiled for yara-python {yara.__version__} -> {compiled}")
 
 
 if __name__ == "__main__":

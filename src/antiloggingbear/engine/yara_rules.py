@@ -48,7 +48,11 @@ class YaraEngine:
                 _path, bundle = found
                 cache = self._data_dir / "cache" if self._data_dir else None
                 try:
-                    self._forge, self.community_rules = forge.compile_bundle(yara, bundle, cache)
+                    ready = forge.load_precompiled(yara, RULES_DIR / forge.COMPILED_NAME, bundle)
+                    if ready is not None:
+                        self._forge, self.community_rules = ready
+                    else:
+                        self._forge, self.community_rules = forge.compile_bundle(yara, bundle, cache)
                     self._core = bundle.core
                     self.release = bundle.release
                     notes.insert(0, f"{self.community_rules:,} community rules from YARA Forge {_pretty(bundle.release)}")

@@ -15,8 +15,41 @@ MAX_SCRIPT_BYTES = 8 * 1024 * 1024
 FLAGS = re.I | re.M
 
 
+_LOWERED: dict = {}
+
+
 def _rx(pattern: str) -> Pattern[str]:
-    return re.compile(pattern, FLAGS)
+    compiled = re.compile(pattern, FLAGS)
+    _LOWERED[compiled] = re.compile(_lower_pattern(pattern), re.M)
+    return compiled
+
+
+def _lower_pattern(pattern: str) -> str:
+    out, index = [], 0
+    while index < len(pattern):
+        if pattern[index] == "\\" and index + 1 < len(pattern):
+            out.append(pattern[index:index + 2])
+            index += 2
+            continue
+        out.append(pattern[index].lower())
+        index += 1
+    return "".join(out)
+
+
+class _Hit:
+    def __init__(self, text: str) -> None:
+        self._text = text
+
+    def group(self) -> str:
+        return self._text
+
+
+def _search(pattern: Pattern[str], text: str, lowered: str | None):
+    fast = _LOWERED.get(pattern)
+    if fast is None or lowered is None:
+        return pattern.search(text)
+    match = fast.search(lowered)
+    return _Hit(text[match.start():match.end()]) if match else None
 
 
 CAPABILITY_RULES: list[tuple[str, Pattern[str], str]] = [
@@ -175,8 +208,11 @@ def analyze_text(path: str, text: str, lang: str, extra: cap.Capabilities | None
 def _scan_text(path: str, text: str, lang: str, decoded_depth: int, extra: cap.Capabilities | None = None,
                prefix: str = "script") -> list[Finding]:
     caps = extra if extra is not None else cap.Capabilities()
+    lowered = text.lower()
+    if len(lowered) != len(text):
+        lowered = None
     for name, pattern, label in CAPABILITY_RULES:
-        m = pattern.search(text)
+        m = _search(pattern, text, lowered)
         if m:
             caps.add(name, f"{label} ({_snippet(m.group())})")
 
@@ -201,7 +237,7 @@ def _scan_text(path: str, text: str, lang: str, decoded_depth: int, extra: cap.C
 
     findings = cap.assess(path, caps, prefix)
     for check, severity, pattern, title in DIRECT_RULES:
-        m = pattern.search(text)
+        m = _search(pattern, text, lowered)
         if m:
             findings.append(Finding(path, "script." + check, severity, title,
                                     "Matched: " + _snippet(m.group())))
