@@ -61,6 +61,16 @@ def sniff(name: str, data: bytes) -> str:
         return "lnk"
     if head.startswith(b"Rar!\x1a\x07"):
         return "rar"
+    if head.startswith(b"MSCF\x00\x00\x00\x00"):
+        return "cab"
+    if head.startswith(b"ITSF"):
+        return "chm"
+    if head.startswith(b"MSWIM\x00\x00\x00"):
+        return "wim"
+    if data[32769:32774] == b"CD001" or (ext in ("iso", "img") and data[32769:32774] in (b"BEA01", b"CD001")):
+        return "iso"
+    if len(data) > 512 and data[-512:-508] == b"koly":
+        return "dmg"
     if head.startswith(b"7z\xbc\xaf\x27\x1c"):
         return "7z"
     if head.startswith(b"\x1f\x8b"):
@@ -149,7 +159,7 @@ def check_content(path: str, kind: str, data: bytes) -> list[Finding]:
     out: list[Finding] = []
     ext = extension(path)
 
-    if kind == "pe" and ext and ext not in EXECUTABLE_EXTS and ext not in {"bin", "dat", "tmp", "mui", "node", "pyd", "drv", "efi", "ax", "acm", "tlb"}:
+    if kind == "pe" and ext and ext not in EXECUTABLE_EXTS and ext not in {"bin", "dat", "tmp", "mui", "node", "pyd", "drv", "efi", "ax", "acm", "tlb", "sfx"}:
         out.append(Finding(path, "content.disguised-exe", Severity.HIGH,
                            f"Windows program hidden behind a .{ext} extension",
                            "The file starts with an executable header even though its name says otherwise."))

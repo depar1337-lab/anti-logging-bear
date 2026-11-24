@@ -9,3 +9,4 @@ dist/
 *.spec.bak
 .cache/
 src/antiloggingbear/rules/forge.bin
+src/antiloggingbear/bin/

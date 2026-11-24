@@ -8,19 +8,22 @@ import time
 from dataclasses import dataclass, field
 from typing import Callable
 
-from . import antivirus, asar, generic, pyinstaller, rar, sevenzip
+from . import antivirus, asar, external7z, generic, pyinstaller, rar, sevenzip
 from .archive import MB, ArchiveWalker, Entry, Limits, StopScan
 from .bazaar import MalwareBazaar
 from .findings import FileRecord, Finding, ScanReport, Severity
 from .office import analyze_office
 from .pdf import analyze_pdf
-from .pe import analyze_pe
+from .pe import analyze_pe, overlay_start
 from .reputation import VirusTotal
 from .scripts import analyze_script
 from .shortcuts import analyze_lnk, analyze_url_shortcut
 from .yara_rules import shared_engine
 
 Progress = Callable[[str], None]
+CONTAINERS = {"msi": "Windows installer package (MSI)", "cab": "cabinet archive (CAB)",
+              "iso": "disk image (ISO)", "dmg": "Mac disk image (DMG)", "chm": "compiled help file (CHM)",
+              "wim": "Windows image (WIM)"}
 
 
 @dataclass
@@ -140,18 +143,23 @@ class Scanner:
         if kind == "zip":
             children.append(self._walker.walk(data, path + "/", depth + 1))
             return []
-        if kind == "7z":
-            found, inner = sevenzip.walk(self._walker, path, data, depth + 1)
+        if kind in ("7z", "rar"):
+            result = external7z.walk(self._walker, path, data, depth + 1, f"{kind.upper()} archive")
+            if result is None:
+                reader = sevenzip if kind == "7z" else rar
+                result = reader.walk(self._walker, path, data, depth + 1)
+            found, inner = result
             children.append(inner)
             return found
-        if kind == "rar":
-            found, inner = rar.walk(self._walker, path, data, depth + 1)
-            children.append(inner)
-            return found
+        if kind in CONTAINERS:
+            return self._open_with_7zip(entry, CONTAINERS[kind], children)
         if kind == "pe":
             found = analyze_pe(path, data, children, depth + 1, self._walker)
             found.extend(pyinstaller.analyze(path, data, children, depth + 1, self._walker))
-            return found
+            installer = self._installer(entry, children)
+            if any(f.check == "installer.opened" for f in installer):
+                found = [f for f in found if f.check != "pe.overlay"]
+            return found + installer
         if kind == "asar":
             found, inner = asar.walk(self._walker, path, data, depth + 1)
             children.append(inner)
@@ -172,6 +180,41 @@ class Scanner:
             return [Finding(path, "archive.unsupported", Severity.MEDIUM,
                             "Contains a GZIP archive Barry can't open - check it separately")]
         return []
+
+    def _open_with_7zip(self, entry: Entry, label: str, children: list) -> list[Finding]:
+        result = external7z.walk(self._walker, entry.path, entry.data, entry.depth + 1, label)
+        if result is None:
+            return [Finding(entry.path, "archive.unsupported", Severity.MEDIUM,
+                            f"Contains a {label} Barry can't open - check it separately")]
+        found, inner = result
+        children.append(inner)
+        return found
+
+    def _installer(self, entry: Entry, children: list) -> list[Finding]:
+        data = entry.data
+        tail = data[overlay_start(data):]
+        if not tail:
+            return []
+        if b"Inno Setup Setup Data" in data and (b"zlb\x1a" in tail or b"idska" in tail or b"rDlPtS" in tail):
+            return [Finding(entry.path, "installer.inno", Severity.INFO,
+                            "Inno Setup installer - Barry checks the installer itself but can't open its files yet")]
+        label = None
+        if b"\xef\xbe\xad\xdeNullsoftInst" in tail:
+            label = "NSIS installer"
+        elif b"7z\xbc\xaf\x27\x1c" in tail:
+            label = "self-extracting 7z archive"
+        elif b"Rar!\x1a\x07" in tail:
+            label = "self-extracting RAR archive"
+        if label is None:
+            return []
+        result = external7z.walk(self._walker, entry.path, data, entry.depth + 1, label)
+        if result is None:
+            return [Finding(entry.path, "installer.unopened", Severity.INFO,
+                            f"{label[0].upper() + label[1:]} - Barry checks it but can't open its files here")]
+        found, inner = result
+        children.append(inner)
+        return [Finding(entry.path, "installer.opened", Severity.INFO,
+                        f"{label[0].upper() + label[1:]} - Barry opened it and checked the files inside")] + found
 
     def _run_antivirus(self, path: str, report: ScanReport) -> None:
         if not self.options.use_antivirus:

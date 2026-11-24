@@ -21,6 +21,7 @@ jobs:
       - run: pip install -r packaging/requirements-win7.txt
       - run: pip install --no-deps .
       - run: python tools/fetch_rules.py
+      - run: python tools/fetch_tools.py
       - run: pyinstaller --noconfirm --distpath dist --workpath build packaging/BarryBear.spec
       - name: Smoke test
         shell: pwsh
@@ -29,6 +30,7 @@ jobs:
           $run = Start-Process -FilePath dist/BarryBear/BarryBear.exe -ArgumentList "note.txt", "--no-av" -Wait -PassThru -NoNewWindow
           if ($run.ExitCode -ne 0) { throw "BarryBear.exe exited with code $($run.ExitCode)" }
           if (-not (Get-ChildItem -Path dist/BarryBear -Recurse -Filter "libtkdnd*.dll")) { throw "drag-and-drop library missing" }
+          if (-not (Get-ChildItem -Path dist/BarryBear -Recurse -Filter "7z.dll")) { throw "7-Zip missing" }
       - name: Portable zip
         shell: pwsh
         run: Compress-Archive -Path dist/BarryBear/* -DestinationPath dist/BarryBear-${{ matrix.arch }}-portable.zip
@@ -73,6 +75,7 @@ jobs:
           python -m pip download --only-binary :all: --no-deps --python-version 3.12 --platform "$platform" --dest yara-wheel yara-python
           python -m pip install yara-wheel/*.whl
       - run: python tools/fetch_rules.py
+      - run: python tools/fetch_tools.py
       - run: pyinstaller --noconfirm --distpath dist --workpath build packaging/BarryBear.spec
       - name: Check minimum macOS
         run: python packaging/macos_minimum.py "dist/Barry Bear.app" "$MACOSX_DEPLOYMENT_TARGET" tkinterdnd2/
@@ -80,6 +83,7 @@ jobs:
         run: |
           echo hello > note.txt
           "dist/Barry Bear.app/Contents/MacOS/Barry Bear" note.txt --no-av
+          find "dist/Barry Bear.app" -name 7zz -perm -u+x | grep -q 7zz
       - name: Disk image
         run: |
           mkdir -p dmg

@@ -44,6 +44,9 @@ datas = [
     (str(PKG / "assets"), "antiloggingbear/assets"),
     (str(PKG / "rules"), "antiloggingbear/rules"),
 ]
+BIN = PKG / "bin"
+tools = [(str(p), "antiloggingbear/bin") for p in sorted(BIN.glob("*")) if p.is_file() and p.suffix != ".txt"]
+datas += [(str(p), "antiloggingbear/bin") for p in sorted(BIN.glob("*.txt"))]
 datas += collect_data_files("tkinterdnd2")
 datas += collect_data_files("oletools", includes=["**/*.txt", "**/*.json"])
 
@@ -52,6 +55,7 @@ hidden = ["pystray._win32"] if sys.platform == "win32" else []
 a = Analysis(
     [str(ROOT / "packaging" / "launcher.py")],
     pathex=[str(ROOT / "src")],
+    binaries=tools,
     datas=datas,
     hiddenimports=hidden,
     excludes=["pytest", "numpy", "matplotlib", "IPython", "setuptools", "pip", "cryptography", "msoffcrypto",

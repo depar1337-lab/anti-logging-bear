@@ -111,6 +111,10 @@ class ArchiveWalker:
                        "File lies about its size inside the archive (possible zip bomb)")
             raise StopScan
         self._total += len(data)
+        if self._total > self.limits.max_total_bytes:
+            self._flag(path, "archive.total", Severity.HIGH,
+                       "Archive unpacks to far more data than expected (possible zip bomb)")
+            raise StopScan
         return Entry(path=path, data=data, depth=depth)
 
     def _read(self, zf: zipfile.ZipFile, info: zipfile.ZipInfo, path: str, depth: int):

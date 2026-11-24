@@ -125,6 +125,16 @@ def analyze_pe(path: str, data: bytes, children: list | None = None, depth: int 
     return findings
 
 
+def overlay_start(data: bytes) -> int:
+    try:
+        pe = pefile.PE(data=data, fast_load=True)
+    except pefile.PEFormatError:
+        return len(data)
+    end = max((s.PointerToRawData + s.SizeOfRawData for s in pe.sections), default=len(data))
+    pe.close()
+    return min(end, len(data))
+
+
 def pyinstaller_like(data: bytes) -> bool:
     return PYINSTALLER_MAGIC in data
 
