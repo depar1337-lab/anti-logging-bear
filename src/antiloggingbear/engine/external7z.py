@@ -21,7 +21,7 @@ MAX_SINGLE_READS = 300
 
 
 def find_tool() -> str:
-    names = ("7z.exe",) if sys.platform == "win32" else ("7zz", "7z")
+    names = ("7z.exe",) if sys.platform == "win32" else ("7zz",)
     for name in names:
         bundled = BIN_DIR / name
         if bundled.is_file():
@@ -33,7 +33,7 @@ def find_tool() -> str:
             if candidate.is_file():
                 return str(candidate)
         return ""
-    for name in ("7zz", "7z", "7za"):
+    for name in ("7zz",):
         found = shutil.which(name)
         if found:
             return found
