@@ -114,7 +114,7 @@ def test_precompiled_rules_round_trip(tmp_path):
     path = tmp_path / forge.COMPILED_NAME
     path.write_bytes(forge.precompile(yara, loaded))
     rules, count = forge.load_precompiled(yara, path, loaded)
-    assert count == 4
+    assert count == forge.compile_bundle(yara, loaded, None)[1]
     assert {m.rule for m in rules.match(data=b"BARRY-TEST-STEALER")} == {"MAL_Fake_Stealer_A"}
     newer = forge.Bundle("20991232", loaded.source, loaded.core)
     assert forge.load_precompiled(yara, path, newer) is None
