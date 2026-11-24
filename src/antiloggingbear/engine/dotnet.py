@@ -18,7 +18,6 @@ TYPE_CAPABILITIES = {
     "System.Net.Sockets.Socket": cap.NETWORK,
     "System.Net.Mail.SmtpClient": cap.NETWORK,
     "System.Net.FtpWebRequest": cap.NETWORK,
-    "System.Security.Cryptography.ProtectedData": cap.CREDENTIALS,
     "System.Windows.Forms.Clipboard": cap.CLIPBOARD,
 }
 MEMBER_CAPABILITIES = {"CopyFromScreen": cap.SCREENSHOT}
@@ -80,10 +79,14 @@ def analyze(path: str, data: bytes, caps: cap.Capabilities, api_lookup: dict, ch
         target = TYPE_CAPABILITIES.get(full)
         if target:
             caps.add(target, str(row.TypeName))
-    for row in _rows(tables, "MemberRef"):
-        target = MEMBER_CAPABILITIES.get(str(row.Name))
+    members = {str(row.Name) for row in _rows(tables, "MemberRef")}
+    for name in members:
+        target = MEMBER_CAPABILITIES.get(name)
         if target:
-            caps.add(target, str(row.Name))
+            caps.add(target, name)
+    if "System.Security.Cryptography.ProtectedData" in type_refs and "Unprotect" in members \
+            and "Protect" not in members:
+        caps.add(cap.CREDENTIALS, "ProtectedData.Unprotect without Protect")
 
     obfuscators = {label for marker, label in OBFUSCATOR_MARKERS.items()
                    if any(marker in ref for ref in type_refs)}

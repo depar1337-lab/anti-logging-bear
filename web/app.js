@@ -170,6 +170,10 @@ async function scanFile(file) {
   }
   if (currentJob !== job) return;
   job.started = performance.now();
+  if (isSevenZipOrRar(buffer)) {
+    await scanArchive(job, file, buffer);
+    return;
+  }
   worker.postMessage({
     type: "scan",
     id: job.id,
@@ -177,6 +181,64 @@ async function scanFile(file) {
     buffer,
     options: { strict: settings.strict, maxUnpackedMb: settings.maxUnpackedMb },
   }, [buffer]);
+}
+
+function isSevenZipOrRar(buffer) {
+  const head = new Uint8Array(buffer, 0, Math.min(8, buffer.byteLength));
+  const starts = (bytes) => bytes.every((value, index) => head[index] === value);
+  return starts([0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c]) || starts([0x52, 0x61, 0x72, 0x21, 0x1a, 0x07]);
+}
+
+let libarchive = null;
+
+async function openArchiveLibrary() {
+  if (!libarchive) {
+    libarchive = import("./libarchive/libarchive.js").then(({ Archive }) => {
+      Archive.init({ workerUrl: new URL("./libarchive/worker-bundle.js", import.meta.url).href });
+      return Archive;
+    });
+  }
+  return libarchive;
+}
+
+async function scanArchive(job, file, buffer) {
+  const kind = new Uint8Array(buffer, 0, 1)[0] === 0x37 ? "7z" : "RAR";
+  $("scan-step").textContent = `Opening the ${kind} archive...`;
+  try {
+    const digest = await crypto.subtle.digest("SHA-256", buffer);
+    const sha256 = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+    const Archive = await openArchiveLibrary();
+    const archive = await Archive.open(file);
+    const listing = await archive.getFilesArray();
+    const encrypted = (await archive.hasEncryptedData()) === true || listing.length === 0;
+    const total = listing.reduce((sum, entry) => sum + (entry.file && entry.file.size || 0), 0);
+    if (total > settings.maxUnpackedMb * MB) {
+      scanFailed(`This ${kind} archive unpacks to ${formatSize(total)}, more than the ${settings.maxUnpackedMb} MB limit in Settings. That's a warning sign by itself.`);
+      return;
+    }
+    const members = [];
+    if (!encrypted) {
+      await archive.extractFiles();
+      for (const entry of await archive.getFilesArray()) {
+        if (!(entry.file instanceof File)) continue;
+        members.push({ path: `${entry.path}${entry.file.name}`, buffer: await entry.file.arrayBuffer() });
+      }
+    }
+    if (currentJob !== job) return;
+    worker.postMessage({
+      type: "scan-members",
+      id: job.id,
+      name: file.name,
+      members,
+      encrypted,
+      sha256,
+      size: file.size,
+      options: { strict: settings.strict, maxUnpackedMb: settings.maxUnpackedMb },
+    }, members.map((member) => member.buffer));
+  } catch (error) {
+    console.warn(error);
+    if (currentJob === job) scanFailed(`Barry couldn't open this ${kind} archive. It may be damaged or password-protected.`);
+  }
 }
 
 function cancelScan(goIdle = true) {

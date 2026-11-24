@@ -2,7 +2,8 @@
 
 const CACHE = "__CACHE_NAME__";
 const FILES = __PRECACHE__;
-const SHELL = FILES.filter((path) => !path.startsWith("pyodide/") && !path.startsWith("py/"));
+const SHELL = FILES.filter((path) => !path.startsWith("pyodide/") && !path.startsWith("py/")
+  && !path.startsWith("libarchive/"));
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL.map((path) => new Request(path, { cache: "no-cache" })))).then(() => self.skipWaiting()));

@@ -26,6 +26,12 @@ PYODIDE_FILES = ("pyodide.mjs", "pyodide.asm.mjs", "pyodide.asm.wasm", "python_s
 PYODIDE_PACKAGES = ("pyyaml",)
 PYODIDE_CDN = f"https://cdn.jsdelivr.net/pyodide/v{PYODIDE_VERSION}/full/"
 
+LIBARCHIVE_VERSION = "2.0.2"
+LIBARCHIVE_SHA256 = "bdcc65af6654b4adbb6cad203272d045d2e25a4cb4281be05b37cc877de92584"
+LIBARCHIVE_URL = f"https://registry.npmjs.org/libarchive.js/-/libarchive.js-{LIBARCHIVE_VERSION}.tgz"
+LIBARCHIVE_FILES = {"dist/libarchive.js": "libarchive.js", "dist/worker-bundle.js": "worker-bundle.js",
+                    "dist/libarchive.wasm": "libarchive.wasm", "LICENSE": "LICENSE.txt"}
+
 STATIC_FILES = ("index.html", "app.css", "app.js", "worker.js", "manifest.webmanifest")
 ENGINE_SOURCES = ("__init__.py", "report.py", "engine/*.py")
 SKIP_IN_WHEELS = ("/tests/", ".dist-info/RECORD")
@@ -51,6 +57,7 @@ def main() -> None:
     shutil.copy2(PACKAGE / "assets" / "forest.png", images / "forest.png")
 
     _write_pyodide(out / "pyodide")
+    _write_libarchive(out / "libarchive")
     (out / "py").mkdir()
     (out / "py" / "barry.zip").write_bytes(_python_bundle())
     _write_service_worker(out)
@@ -68,6 +75,17 @@ def _download(url: str, target: Path, sha256: str) -> bytes:
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(data)
     return data
+
+
+def _write_libarchive(target: Path) -> None:
+    data = _download(LIBARCHIVE_URL, CACHE / f"libarchive.js-{LIBARCHIVE_VERSION}.tgz", LIBARCHIVE_SHA256)
+    target.mkdir()
+    with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tar:
+        for source, name in LIBARCHIVE_FILES.items():
+            member = tar.extractfile(f"package/{source}")
+            if member is None:
+                raise SystemExit(f"{source} missing from the libarchive.js package")
+            (target / name).write_bytes(member.read())
 
 
 def _write_pyodide(target: Path) -> None:

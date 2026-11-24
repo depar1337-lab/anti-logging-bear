@@ -52,8 +52,9 @@ def scan_path(path: str, options: ScanOptions | None = None,
     return Scanner(options or ScanOptions(), progress, cancelled).run(path)
 
 
-def scan_data(name: str, data: bytes, options: ScanOptions | None = None) -> ScanReport:
-    scanner = Scanner(options or ScanOptions(use_antivirus=False), None, lambda: False)
+def scan_data(name: str, data: bytes, options: ScanOptions | None = None,
+              progress: Progress | None = None) -> ScanReport:
+    scanner = Scanner(options or ScanOptions(use_antivirus=False), progress, lambda: False)
     started = time.monotonic()
     report = ScanReport(target=name, strict=scanner.options.strict)
     if scanner.options.use_yara:

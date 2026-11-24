@@ -122,20 +122,18 @@ def analyze_pe(path: str, data: bytes, children: list | None = None, depth: int 
     if pe.OPTIONAL_HEADER.DATA_DIRECTORY[4].VirtualAddress != 0 and source and authenticode.supported():
         signature = authenticode.verify_file(source)
     verified = signature is not None and signature.status == authenticode.VALID
-    lowered = []
-    if not caps.trusted:
-        assessed = cap.assess(path, caps, "pe")
-        findings.extend(assessed)
-        lowered.extend(assessed)
+    engine = _installer_engine(data)
+    assessed = cap.assess(path, caps, "pe") if not caps.trusted else []
+    findings.extend(assessed)
     structure = _structure(path, pe, data, imports, signature)
     findings.extend(structure)
-    lowered.extend(f for f in structure if f.check in _SIGNABLE_STRUCTURE)
+    if engine:
+        _lower(assessed, 1, f"{engine} installers write start-up entries and download files by design; "
+                            "Barry checks what they install separately")
     if verified:
-        for finding in lowered:
-            if finding.severity > Severity.INFO:
-                finding.severity = Severity(int(finding.severity) - 1)
-                finding.detail = (finding.detail + " " if finding.detail else "") + \
-                    f"(Lowered one step: signed by {signature.signer or 'a trusted publisher'}.)"
+        who = signature.signer or "a trusted publisher"
+        _lower(assessed, 2, f"signed by {who}")
+        _lower([f for f in structure if f.check in _SIGNABLE_STRUCTURE], 1, f"signed by {who}")
     if pyinstaller_like(data):
         findings = [f for f in findings if f.check not in ("pe.overlay",)]
 
@@ -154,10 +152,28 @@ def analyze_pe(path: str, data: bytes, children: list | None = None, depth: int 
 _SIGNABLE_STRUCTURE = {"pe.packed", "pe.encrypted-code", "pe.hidden-imports", "pe.overlay"}
 
 
+def _lower(findings: list, steps: int, reason: str) -> None:
+    for finding in findings:
+        if finding.severity > Severity.INFO:
+            finding.severity = Severity(max(int(finding.severity) - steps, int(Severity.INFO)))
+            finding.detail = (finding.detail + " " if finding.detail else "") + f"(Lowered: {reason}.)"
+
+
+def _installer_engine(data: bytes) -> str:
+    tail = data[overlay_start(data):]
+    if b"\xef\xbe\xad\xdeNullsoftInst" in tail or b"Nullsoft Install System" in data[:200000]:
+        return "NSIS"
+    if b"Inno Setup" in data and (b"InnoSetupLdrWindow" in data or b"Inno Setup Setup Data" in data
+                                   or b"Inno Setup Messages" in data):
+        return "Inno Setup"
+    return ""
+
+
 def _chromium_runtime(data: bytes, strings: str) -> bool:
     if len(data) < 30 * 1024 * 1024:
         return False
-    markers = ("Chromium", "chrome_elf", "content_shell", "Electron", "CEF_VERSION", "libcef")
+    markers = ("Chromium", "chrome_elf", "content_shell", "Electron", "CEF_VERSION", "libcef", "QtWebEngine",
+               "blink::", "v8::internal")
     return sum(1 for marker in markers if marker in strings) >= 2
 
 
