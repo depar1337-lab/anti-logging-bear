@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.3.0
+
+- Opens installers and more archive types with a bundled 7-Zip: NSIS installers, self-extracting archives, MSI, CAB, CHM, ISO and DMG, plus every RAR version
+- Check a whole folder from the window, the right-click menu, drag and drop or the command line
+- Verifies Windows code signatures: shows who signed a program, and flags tampered programs and revoked certificates
+- The web app opens 7z and RAR archives
+- Faster: script checks run about twice as fast, and the community rules load in under a second the first time
+- Fewer false alarms on signed software, browsers and Chromium-based apps, installers, and .NET apps that store their own logins
+- Signing-ready builds (see docs/SIGNING.md) and a benchmark tool for measuring detection
+
 ## 1.2.0
 
 - Over 10,000 community YARA rules from YARA Forge, downloaded weekly and kept compressed so antivirus doesn't mistake them for malware
