@@ -134,10 +134,13 @@ def main() -> None:
     options = ScanOptions(use_antivirus=False)
     result = {}
     key = os.environ.get("MB_API_KEY", "")
+    if not key:
+        from antiloggingbear import settings as config
+        key = config.load().mb_api_key
     if key:
         result["malware"] = malware(key, args.per_family, options)
     else:
-        print("MB_API_KEY not set - skipping the malware samples")
+        print("No MalwareBazaar key (MB_API_KEY or Barry's settings) - skipping the malware samples")
     if args.clean:
         result["clean"] = clean(args.clean, args.clean_limit, options)
     out = Path(args.out)
