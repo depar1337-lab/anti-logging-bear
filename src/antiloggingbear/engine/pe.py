@@ -149,7 +149,7 @@ def analyze_pe(path: str, data: bytes, children: list | None = None, depth: int 
     return findings
 
 
-_SIGNABLE_STRUCTURE = {"pe.packed", "pe.encrypted-code", "pe.hidden-imports", "pe.overlay"}
+_SIGNABLE_STRUCTURE = {"pe.packed", "pe.encrypted-code", "pe.hidden-imports", "pe.overlay", "pe.dotnet-encrypted"}
 
 
 def _lower(findings: list, steps: int, reason: str) -> None:
@@ -264,6 +264,15 @@ def _structure(path: str, pe: pefile.PE, data: bytes, imports: set[str], signatu
 
     if dotnet:
         out.append(Finding(path, "pe.dotnet", Severity.INFO, ".NET program (Barry read its code references)"))
+        text = next((s for s in pe.sections if s.Name.rstrip(b"\x00") == b".text"), None)
+        satellite = path.lower().endswith(".resources.dll")
+        if text is not None and not satellite and text.SizeOfRawData >= 65536:
+            text_entropy = entropy(text.get_data())
+            if text_entropy >= 7.45:
+                out.append(Finding(path, "pe.dotnet-encrypted", Severity.HIGH,
+                                   ".NET program whose code is mostly encrypted data - Barry can't see what it does",
+                                   f"Its code section is {text_entropy:.2f} out of 8 random. Real .NET code is far "
+                                   "lower; packed malware (crypters) look like this."))
     if extension(path) == "scr":
         out.append(Finding(path, "pe.screensaver", Severity.MEDIUM,
                            "Screensaver file - these are programs and a classic way to sneak in malware"))

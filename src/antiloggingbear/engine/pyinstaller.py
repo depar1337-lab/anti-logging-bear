@@ -40,6 +40,7 @@ class Bundle:
     own: list = field(default_factory=list)
     encrypted: bool = False
     damaged: bool = False
+    data_files: list = field(default_factory=list)
 
 
 def analyze(path: str, data: bytes, children: list, depth: int, walker) -> list[Finding]:
@@ -56,10 +57,12 @@ def analyze(path: str, data: bytes, children: list, depth: int, walker) -> list[
     if bundle.damaged:
         findings.append(Finding(path, "pyinstaller.damaged", Severity.MEDIUM,
                                 "Part of the packed Python code is damaged or hidden"))
-    if bundle.encrypted:
-        findings.append(Finding(path, "pyinstaller.encrypted", Severity.MEDIUM,
-                                "Some of its Python code is encrypted, so Barry can't read it",
-                                "PyInstaller can encrypt code; malware authors use it to hide from scanners."))
+    hidden = [name for name in bundle.data_files if name.lower().endswith((".aes", ".enc", ".encrypted"))]
+    if bundle.encrypted or hidden:
+        findings.append(Finding(path, "pyinstaller.encrypted", Severity.HIGH,
+                                "Hides its real Python code encrypted, so Barry can't read it",
+                                "Normal Python programs don't need this; grabbers like Blank Grabber do it to dodge "
+                                "scanners." + (f" Encrypted file: {hidden[0]}" if hidden else "")))
 
     names = set(bundle.modules)
     for name in sorted(names):
@@ -127,6 +130,8 @@ def read_bundle(data: bytes) -> Bundle | None:
                 bundle.scripts.append((name, code))
         elif kind in (b"z", b"Z"):
             _read_pyz(blob, bundle)
+        elif kind == b"x":
+            bundle.data_files.append(name)
     return bundle
 
 

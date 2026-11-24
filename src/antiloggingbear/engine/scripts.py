@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import binascii
 import re
+import zlib
 from typing import Pattern
 
 from . import capabilities as cap
@@ -128,7 +129,25 @@ CAPABILITY_RULES: list[tuple[str, Pattern[str], str]] = [
      "downloads a file and starts it (Lua)"),
 ]
 
+WSH_LANGS = {"jscript", "vbscript", "wsh", "hta"}
+WSH_MARKERS = _rx(r"ActiveXObject|CreateObject\s*\(|WScript\.|GetObject\s*\(")
+WEB_JS_MARKERS = _rx(r"\brequire\s*\(|module\.exports|\bexports\.|\bwindow\.|\bdocument\.|__webpack|\bself\.")
+WSH_RULES: list[tuple[str, Severity, Pattern[str], str]] = [
+    ("dropper.wsh-powershell", Severity.HIGH,
+     _rx(r"(?:WScript\.Shell|Shell\.Application|ShellExecute)[\s\S]{0,3000}?powershell"
+         r"|powershell[\s\S]{0,3000}?(?:WScript\.Shell|Shell\.Application|ShellExecute)"),
+     "Windows script that quietly starts PowerShell - a common first step for malware"),
+    ("dropper.write-and-run", Severity.HIGH,
+     _rx(r"ADODB\.Stream[\s\S]{0,4000}?SaveToFile[\s\S]{0,4000}?(?:\.Run\b|\.Exec\b|ShellExecute)"),
+     "Writes a file to disk and runs it"),
+]
 DIRECT_RULES: list[tuple[str, Severity, Pattern[str], str]] = [
+    ("dropper.memory-loader", Severity.CRITICAL,
+     _rx(r"(?:DownloadData|DownloadString|Invoke-WebRequest|\biwr\b|Invoke-RestMethod|\birm\b|Net\.WebClient|HttpClient)"
+         r"[\s\S]{0,3000}?(?:Reflection\.Assembly\]?::Load|Assembly\]::Load|\.Load\s*\(\s*\[?Convert)"
+         r"|(?:Reflection\.Assembly\]?::Load|Assembly\]::Load)[\s\S]{0,3000}?"
+         r"(?:DownloadData|DownloadString|Invoke-WebRequest|\biwr\b|Net\.WebClient)"),
+     "Downloads a program and runs it straight from memory (a fileless loader)"),
     ("obfuscation.ps-encoded", Severity.HIGH,
      _rx(r"-e(?:nc|ncodedcommand|c)?\s+[A-Za-z0-9+/=]{40,}"),
      "Runs a hidden, encoded PowerShell command"),
@@ -242,6 +261,14 @@ def _scan_text(path: str, text: str, lang: str, decoded_depth: int, extra: cap.C
             findings.append(Finding(path, "script." + check, severity, title,
                                     "Matched: " + _snippet(m.group())))
 
+    if lang in WSH_LANGS or (lang == "jscript" and WSH_MARKERS.search(text[:2_000_000])):
+        for check, severity, pattern, title in WSH_RULES:
+            m = _search(pattern, text, lowered)
+            if m:
+                findings.append(Finding(path, "script." + check, severity, title,
+                                        "Matched: " + _snippet(m.group())))
+    findings.extend(_layout(path, text, lang))
+
     if decoded_depth == 0:
         findings.extend(_scan_decoded(path, text, lang))
 
@@ -249,6 +276,29 @@ def _scan_text(path: str, text: str, lang: str, decoded_depth: int, extra: cap.C
     if urls and findings:
         findings[0].indicators.extend(u for u in urls if u not in findings[0].indicators)
     return findings
+
+
+def _layout(path: str, text: str, lang: str) -> list[Finding]:
+    if lang not in WSH_LANGS | {"batch", "powershell"}:
+        return []
+    longest = max((len(line) for line in text.splitlines()), default=0)
+    if longest < 50_000:
+        return []
+    windows_script = lang in WSH_LANGS and (lang != "jscript" or bool(WSH_MARKERS.search(text[:2_000_000])))
+    if lang == "jscript" and not windows_script:
+        if longest < 500_000 or WEB_JS_MARKERS.search(text[:2_000_000]):
+            return []
+        return [Finding(path, "script.obfuscation.giant-line", Severity.MEDIUM,
+                        "Script is one huge line of code (generated or scrambled)",
+                        f"Its longest line is {longest:,} characters. Scripts written by people never look like this.")]
+    if windows_script:
+        severity = Severity.CRITICAL if longest >= 200_000 else Severity.HIGH
+        return [Finding(path, "script.obfuscation.giant-line", severity,
+                        "Huge scrambled Windows script - the way malware droppers hide their code",
+                        f"Its longest line is {longest:,} characters, and it can control Windows through ActiveX.")]
+    return [Finding(path, "script.obfuscation.giant-line", Severity.HIGH,
+                    "Hides a huge encoded block on a single line",
+                    f"Its longest line is {longest:,} characters - usually a program hidden inside the script.")]
 
 
 def _scan_decoded(path: str, text: str, lang: str) -> list[Finding]:
@@ -259,6 +309,7 @@ def _scan_decoded(path: str, text: str, lang: str) -> list[Finding]:
         raw = _b64(blob)
         if not raw:
             continue
+        raw = _inflate(raw)
         if raw.startswith(b"MZ"):
             out.append(Finding(path, "script.payload.embedded-exe", Severity.HIGH,
                                "Carries a hidden Windows program inside the script"))
@@ -285,6 +336,20 @@ def _scan_passive_text(path: str, text: str) -> list[Finding]:
         out.append(Finding(path, "text.embedded-exe", Severity.HIGH,
                            "Text file carries an encoded Windows program"))
     return out
+
+
+def _inflate(raw: bytes) -> bytes:
+    if raw[:2] == b"\x1f\x8b":
+        try:
+            return zlib.decompressobj(16 + zlib.MAX_WBITS).decompress(raw, MAX_SCRIPT_BYTES)
+        except zlib.error:
+            return raw
+    if raw[:1] in (b"\x78",) and raw[1:2] in (b"\x01", b"\x5e", b"\x9c", b"\xda"):
+        try:
+            return zlib.decompressobj().decompress(raw, MAX_SCRIPT_BYTES)
+        except zlib.error:
+            return raw
+    return raw
 
 
 def _b64(blob: str) -> bytes:
