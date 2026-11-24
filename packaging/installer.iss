@@ -53,6 +53,7 @@ Name: "{autodesktop}\Barry Bear"; Filename: "{app}\BarryBear.exe"; Tasks: deskto
 
 [Registry]
 Root: HKCU; Subkey: "Software\Classes\*\shell\AntiLoggingBear"; Flags: uninsdeletekey dontcreatekey
+Root: HKCU; Subkey: "Software\Classes\Directory\shell\AntiLoggingBear"; Flags: uninsdeletekey dontcreatekey
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "Barry Bear"; Flags: uninsdeletevalue dontcreatekey
 Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "Anti-Logging Bear"; Flags: uninsdeletevalue dontcreatekey
 

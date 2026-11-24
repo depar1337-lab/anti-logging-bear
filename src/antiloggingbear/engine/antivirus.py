@@ -85,7 +85,8 @@ def _run_defender(exe: str, path: str) -> tuple[str, list[Finding]]:
 
 def _run_clamav(exe: str, path: str) -> tuple[str, list[Finding]]:
     try:
-        proc = _run([exe, "--no-summary", "--infected", "--scan-archive=yes", os.path.abspath(path)])
+        recursive = ["--recursive"] if os.path.isdir(path) else []
+        proc = _run([exe, "--no-summary", "--infected", "--scan-archive=yes", *recursive, os.path.abspath(path)])
     except (OSError, subprocess.TimeoutExpired) as exc:
         return f"error: {exc}", []
     output = proc.stdout.decode("utf-8", "replace")

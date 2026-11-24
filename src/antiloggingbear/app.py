@@ -183,7 +183,7 @@ class Application:
         def dropped(event):
             self.window.drop_zone.set_drag_active(False)
             for path in self.root.tk.splitlist(event.data):
-                if os.path.isfile(path):
+                if os.path.isfile(path) or os.path.isdir(path):
                     self.scan(path)
             return event.action
 
@@ -299,6 +299,14 @@ class Application:
         initial = self.settings.watch_folders[0] if self.settings.watch_folders else str(paths.downloads_dir())
         path = filedialog.askopenfilename(parent=self.root, title="Choose a download to check",
                                           initialdir=initial, filetypes=FILE_TYPES)
+        if path:
+            self.scan(path)
+
+    def choose_folder_and_scan(self) -> None:
+        self.show_window()
+        initial = self.settings.watch_folders[0] if self.settings.watch_folders else str(paths.downloads_dir())
+        path = filedialog.askdirectory(parent=self.root, title="Choose a folder to check", initialdir=initial,
+                                       mustexist=True)
         if path:
             self.scan(path)
 
@@ -419,7 +427,7 @@ class Application:
         if message.get("show", True):
             self.show_window()
         for path in message.get("paths") or []:
-            if isinstance(path, str) and os.path.isfile(path):
+            if isinstance(path, str) and (os.path.isfile(path) or os.path.isdir(path)):
                 self.scan(path)
 
     def show_window(self) -> None:

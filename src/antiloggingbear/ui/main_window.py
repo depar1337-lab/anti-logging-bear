@@ -119,6 +119,8 @@ class MainWindow:
         actions.grid(row=2, column=0, sticky="w")
         ttk.Button(actions, text="Choose a file...", style="Accent.TButton",
                    command=self.app.choose_and_scan).pack(side="left")
+        ttk.Button(actions, text="Check a folder...", command=self.app.choose_folder_and_scan).pack(
+            side="left", padx=(8, 0))
         self.auto_var = tk.BooleanVar(value=self.app.settings.auto_scan)
         ttk.Checkbutton(actions, text="Check new downloads automatically", variable=self.auto_var,
                         style="TCheckbutton",
@@ -211,6 +213,7 @@ class MainWindow:
     def _bind_keys(self) -> None:
         mod = "Command" if self.root.tk.call("tk", "windowingsystem") == "aqua" else "Control"
         self.root.bind(f"<{mod}-o>", lambda _e: self.app.choose_and_scan())
+        self.root.bind(f"<{mod}-O>", lambda _e: self.app.choose_folder_and_scan())
         self.root.bind(f"<{mod}-d>", lambda _e: self.toggle_details())
         self.root.bind(f"<{mod}-comma>", lambda _e: self.app.open_settings())
         self.root.bind(f"<{mod}-s>", lambda _e: self.report and self.app.save_report(self.report))

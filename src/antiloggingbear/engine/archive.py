@@ -30,6 +30,7 @@ class Entry:
     path: str
     data: bytes
     depth: int
+    source: str = ""
 
 
 class StopScan(Exception):

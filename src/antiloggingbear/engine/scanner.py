@@ -21,6 +21,7 @@ from .shortcuts import analyze_lnk, analyze_url_shortcut
 from .yara_rules import shared_engine
 
 Progress = Callable[[str], None]
+MAX_FOLDER_FILES = 20000
 CONTAINERS = {"msi": "Windows installer package (MSI)", "cab": "cabinet archive (CAB)",
               "iso": "disk image (ISO)", "dmg": "Mac disk image (DMG)", "chm": "compiled help file (CHM)",
               "wim": "Windows image (WIM)"}
@@ -72,24 +73,11 @@ class Scanner:
         else:
             report.engines["YARA"] = "off"
 
-        size = os.path.getsize(path)
-        report.extend(generic.check_name(name))
-        try:
-            if size > self.options.max_file_bytes:
-                report.add(Finding(name, "file.too-large", Severity.MEDIUM,
-                                   f"File is larger than the scan limit ({size / MB:.0f} MB)"))
-            elif self._is_plain_zip(path, name):
-                report.files.append(FileRecord(name, size, _sha256_file(path), "zip"))
-                for entry in self._walker.walk(path, "", 0):
-                    self._scan_tree(entry, report)
-            else:
-                with open(path, "rb") as fh:
-                    data = fh.read()
-                self._scan_tree(Entry(path=name, data=data, depth=0), report, inspect_names=False)
-        except StopScan:
-            pass
-        finally:
-            report.extend(self._walker.findings)
+        if os.path.isdir(path):
+            self._scan_folder(path, report)
+        else:
+            report.extend(generic.check_name(name))
+            self._scan_file(path, name, report, inspect_names=False)
 
         self._check_cancel()
         self._run_antivirus(path, report)
@@ -97,6 +85,51 @@ class Scanner:
         self._run_bazaar(report)
         report.duration = time.monotonic() - started
         return report
+
+    def _scan_file(self, path: str, name: str, report: ScanReport, inspect_names: bool) -> None:
+        size = os.path.getsize(path)
+        self._walker = ArchiveWalker(self.options.limits)
+        try:
+            if size > self.options.max_file_bytes:
+                report.add(Finding(name, "file.too-large", Severity.MEDIUM,
+                                   f"File is larger than the scan limit ({size / MB:.0f} MB)"))
+            elif self._is_plain_zip(path, name):
+                report.files.append(FileRecord(name, size, _sha256_file(path), "zip"))
+                if inspect_names:
+                    report.extend(generic.check_name(name))
+                for entry in self._walker.walk(path, name + "/" if inspect_names else "", 0):
+                    self._scan_tree(entry, report)
+            else:
+                with open(path, "rb") as fh:
+                    data = fh.read()
+                self._scan_tree(Entry(path=name, data=data, depth=0, source=path), report,
+                                inspect_names=inspect_names)
+        except StopScan:
+            pass
+        finally:
+            report.extend(self._walker.findings)
+
+    def _scan_folder(self, folder: str, report: ScanReport) -> None:
+        count = 0
+        for root, dirs, files in os.walk(folder):
+            dirs[:] = sorted(d for d in dirs if not os.path.islink(os.path.join(root, d)))
+            for filename in sorted(files):
+                full = os.path.join(root, filename)
+                if os.path.islink(full) or not os.path.isfile(full):
+                    continue
+                count += 1
+                if count > MAX_FOLDER_FILES:
+                    report.add(Finding(os.path.basename(folder), "folder.too-many", Severity.MEDIUM,
+                                       f"Folder has more than {MAX_FOLDER_FILES:,} files - Barry checked the first "
+                                       f"{MAX_FOLDER_FILES:,}"))
+                    return
+                self._check_cancel()
+                relative = os.path.relpath(full, folder).replace(os.sep, "/")
+                try:
+                    self._scan_file(full, relative, report, inspect_names=True)
+                except OSError as exc:
+                    report.add(Finding(relative, "file.unreadable", Severity.INFO,
+                                       "Barry couldn't open this file", str(exc)[:200]))
 
     @staticmethod
     def _is_plain_zip(path: str, name: str) -> bool:
@@ -154,7 +187,7 @@ class Scanner:
         if kind in CONTAINERS:
             return self._open_with_7zip(entry, CONTAINERS[kind], children)
         if kind == "pe":
-            found = analyze_pe(path, data, children, depth + 1, self._walker)
+            found = analyze_pe(path, data, children, depth + 1, self._walker, entry.source)
             found.extend(pyinstaller.analyze(path, data, children, depth + 1, self._walker))
             installer = self._installer(entry, children)
             if any(f.check == "installer.opened" for f in installer):

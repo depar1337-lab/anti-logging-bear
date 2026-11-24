@@ -14,7 +14,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="antiloggingbear",
         description=f"{APP_NAME} - checks downloads for keyloggers and malware before you unzip them.",
     )
-    parser.add_argument("paths", nargs="*", help="files or zip archives to check")
+    parser.add_argument("paths", nargs="*", help="files, archives or folders to check")
     parser.add_argument("--gui", action="store_true", help="open the window (and scan any given paths)")
     parser.add_argument("--background", action="store_true", help="start hidden and watch for downloads")
     parser.add_argument("--json", action="store_true", help="print a JSON report")
@@ -54,7 +54,7 @@ def _run_cli(args: argparse.Namespace) -> int:
 
     worst = 0
     for path in args.paths:
-        if not os.path.isfile(path):
+        if not (os.path.isfile(path) or os.path.isdir(path)):
             print(f"{path}: not a file", file=sys.stderr)
             worst = max(worst, 3)
             continue

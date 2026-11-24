@@ -14,6 +14,7 @@ from . import paths
 
 RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
 MENU_KEY = r"Software\Classes\*\shell\AntiLoggingBear"
+FOLDER_MENU_KEY = r"Software\Classes\Directory\shell\AntiLoggingBear"
 LAUNCH_AGENT = Path.home() / "Library" / "LaunchAgents" / "com.priest.antiloggingbear.plist"
 AUTOSTART = Path.home() / ".config" / "autostart" / "anti-logging-bear.desktop"
 
@@ -71,17 +72,18 @@ def set_context_menu(enabled: bool) -> None:
     if sys.platform != "win32":
         return
     import winreg
-    if enabled:
-        icon = sys.executable if getattr(sys, "frozen", False) else str(paths.asset("app.ico"))
-        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, MENU_KEY) as key:
-            winreg.SetValueEx(key, None, 0, winreg.REG_SZ, f"Check with {APP_NAME}")
-            winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, icon)
-        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, MENU_KEY + r"\command") as key:
-            winreg.SetValueEx(key, None, 0, winreg.REG_SZ, _quote(launch_command() + ["--gui"]) + ' "%1"')
-    else:
-        for sub in (MENU_KEY + r"\command", MENU_KEY):
-            with contextlib.suppress(FileNotFoundError):
-                winreg.DeleteKey(winreg.HKEY_CURRENT_USER, sub)
+    for menu in (MENU_KEY, FOLDER_MENU_KEY):
+        if enabled:
+            icon = sys.executable if getattr(sys, "frozen", False) else str(paths.asset("app.ico"))
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, menu) as key:
+                winreg.SetValueEx(key, None, 0, winreg.REG_SZ, f"Check with {APP_NAME}")
+                winreg.SetValueEx(key, "Icon", 0, winreg.REG_SZ, icon)
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, menu + r"\command") as key:
+                winreg.SetValueEx(key, None, 0, winreg.REG_SZ, _quote(launch_command() + ["--gui"]) + ' "%1"')
+        else:
+            for sub in (menu + r"\command", menu):
+                with contextlib.suppress(FileNotFoundError):
+                    winreg.DeleteKey(winreg.HKEY_CURRENT_USER, sub)
 
 
 def open_folder(path: str) -> None:

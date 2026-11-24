@@ -6,8 +6,8 @@ import re
 
 import pefile
 
+from . import authenticode, dotnet
 from . import capabilities as cap
-from . import dotnet
 from . import indicators as ioc
 from .findings import Finding, Severity
 from .generic import entropy, extension
@@ -33,10 +33,12 @@ _DOWNLOAD_API = {"urldownloadtofilea", "urldownloadtofilew"}
 _EXEC_API = {"shellexecutea", "shellexecutew", "shellexecuteexa", "shellexecuteexw", "winexec",
              "createprocessa", "createprocessw"}
 _REMOTE_WRITE = {"writeprocessmemory"}
+_SET_CONTEXT = {"setthreadcontext", "wow64setthreadcontext"}
 _REMOTE_THREAD = {"createremotethread", "ntcreatethreadex", "queueuserapc", "rtlcreateuserthread"}
 _STRING_APIS = re.compile(
     r"\b(SetWindowsHookEx[AW]?|GetAsyncKeyState|RegisterRawInputDevices|GetClipboardData"
     r"|VirtualAllocEx|WriteProcessMemory|CreateRemoteThread|NtUnmapViewOfSection|ZwUnmapViewOfSection"
+    r"|SetThreadContext|Wow64SetThreadContext"
     r"|CryptUnprotectData|URLDownloadToFile[AW]?|InternetOpenUrl[AW]?|WinHttpOpen|HttpClient|WebClient"
     r"|SmtpClient|UploadValues|UploadString|UploadFile)\b"
 )
@@ -52,7 +54,8 @@ _NET_STRING_MAP = {
 }
 
 
-def analyze_pe(path: str, data: bytes, children: list | None = None, depth: int = 0, walker=None) -> list[Finding]:
+def analyze_pe(path: str, data: bytes, children: list | None = None, depth: int = 0, walker=None,
+               source: str = "") -> list[Finding]:
     try:
         pe = pefile.PE(data=data, fast_load=True)
         pe.parse_data_directories(directories=[
@@ -104,12 +107,35 @@ def analyze_pe(path: str, data: bytes, children: list | None = None, depth: int 
     # Loaders and trainers import one or two of these; real injection needs a remote write and a remote thread.
     if not (named & _REMOTE_WRITE and named & _REMOTE_THREAD):
         caps.discard(cap.INJECTION)
+    if not imports & {"ntunmapviewofsection", "zwunmapviewofsection"} and not named & _SET_CONTEXT:
+        caps.discard(cap.HOLLOWING)
 
+    if _chromium_runtime(data, strings):
+        caps.discard(cap.CREDENTIALS)
+        findings.append(Finding(path, "pe.chromium", Severity.INFO,
+                                "Built on the Chromium browser engine (like Chrome, Edge and Electron apps)",
+                                "Chromium contains its own cookie and password code, so Barry judges the app by "
+                                "its own code instead, such as the app.asar file next to it."))
     if pe.OPTIONAL_HEADER.DATA_DIRECTORY[14].VirtualAddress != 0:
         findings.extend(dotnet.analyze(path, data, caps, _API_LOOKUP, children, depth, walker))
+    signature = None
+    if pe.OPTIONAL_HEADER.DATA_DIRECTORY[4].VirtualAddress != 0 and source and authenticode.supported():
+        signature = authenticode.verify_file(source)
+    verified = signature is not None and signature.status == authenticode.VALID
+    lowered = []
     if not caps.trusted:
-        findings.extend(cap.assess(path, caps, "pe"))
-    findings.extend(_structure(path, pe, data, imports))
+        assessed = cap.assess(path, caps, "pe")
+        findings.extend(assessed)
+        lowered.extend(assessed)
+    structure = _structure(path, pe, data, imports, signature)
+    findings.extend(structure)
+    lowered.extend(f for f in structure if f.check in _SIGNABLE_STRUCTURE)
+    if verified:
+        for finding in lowered:
+            if finding.severity > Severity.INFO:
+                finding.severity = Severity(int(finding.severity) - 1)
+                finding.detail = (finding.detail + " " if finding.detail else "") + \
+                    f"(Lowered one step: signed by {signature.signer or 'a trusted publisher'}.)"
     if pyinstaller_like(data):
         findings = [f for f in findings if f.check not in ("pe.overlay",)]
 
@@ -123,6 +149,16 @@ def analyze_pe(path: str, data: bytes, children: list | None = None, depth: int 
                                 "This is an ASI mod - your game loads it automatically on start"))
     pe.close()
     return findings
+
+
+_SIGNABLE_STRUCTURE = {"pe.packed", "pe.encrypted-code", "pe.hidden-imports", "pe.overlay"}
+
+
+def _chromium_runtime(data: bytes, strings: str) -> bool:
+    if len(data) < 30 * 1024 * 1024:
+        return False
+    markers = ("Chromium", "chrome_elf", "content_shell", "Electron", "CEF_VERSION", "libcef")
+    return sum(1 for marker in markers if marker in strings) >= 2
 
 
 def overlay_start(data: bytes) -> int:
@@ -149,7 +185,7 @@ def _imports(pe: pefile.PE) -> set[str]:
     return names
 
 
-def _structure(path: str, pe: pefile.PE, data: bytes, imports: set[str]) -> list[Finding]:
+def _structure(path: str, pe: pefile.PE, data: bytes, imports: set[str], signature=None) -> list[Finding]:
     out: list[Finding] = []
     packers: list[str] = []
     dense = 0
@@ -187,9 +223,26 @@ def _structure(path: str, pe: pefile.PE, data: bytes, imports: set[str]) -> list
                                "Carries a large encrypted payload after its code",
                                "Installers do this too; packed malware does it a lot."))
 
-    if signed:
+    status = signature.status if signature is not None else authenticode.UNKNOWN
+    who = signature.signer if signature is not None and signature.signer else "an unknown publisher"
+    if signed and status == authenticode.VALID:
+        out.append(Finding(path, "pe.signed", Severity.INFO, f"Signed by {who} (signature checked by Windows)"))
+    elif signed and status == authenticode.TAMPERED:
+        out.append(Finding(path, "pe.signature-broken", Severity.HIGH,
+                           "Its digital signature doesn't match - the program was changed after it was signed",
+                           "Tampered installers are a common way to slip malware into real software."))
+    elif signed and status == authenticode.DISTRUSTED:
+        out.append(Finding(path, "pe.signature-revoked", Severity.HIGH,
+                           f"Signed with a certificate Windows has revoked or blocked ({who})",
+                           "Certificates are revoked when they're stolen or used to sign malware."))
+    elif signed and status == authenticode.UNTRUSTED:
+        out.append(Finding(path, "pe.signature-untrusted", Severity.MEDIUM,
+                           f"Signed by {who}, but Windows doesn't trust the certificate",
+                           "Self-made or expired certificates prove nothing about who made the program."))
+    elif signed:
         out.append(Finding(path, "pe.signed", Severity.INFO,
-                           "Has a digital signature (not verified - Barry doesn't unpack files to check it)"))
+                           "Has a digital signature (Barry can only check signatures on Windows, for files "
+                           "that aren't inside an archive)"))
     elif extension(path) in ("exe", "scr", "msi", "sys"):
         out.append(Finding(path, "pe.unsigned", Severity.INFO, "Program is not digitally signed"))
 
