@@ -9,6 +9,7 @@ import json
 import os
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -30,8 +31,17 @@ PASSWORD = b"infected"
 def query(key: str, fields: dict) -> dict:
     request = urllib.request.Request(API, data=urllib.parse.urlencode(fields).encode("ascii"),
                                      headers={"Auth-Key": key, "User-Agent": "BarryBear-benchmark"})
-    with urllib.request.urlopen(request, timeout=120) as resp:
-        body = resp.read(MAX_SAMPLE + 1)
+    for attempt in range(6):
+        try:
+            with urllib.request.urlopen(request, timeout=120) as resp:
+                body = resp.read(MAX_SAMPLE + 1)
+            break
+        except urllib.error.HTTPError as exc:
+            if exc.code != 429 or attempt == 5:
+                raise
+            wait = 30 * (attempt + 1)
+            print(f"  rate limited, waiting {wait}s", flush=True)
+            time.sleep(wait)
     if fields.get("query") == "get_file":
         return {"zip": body}
     return json.loads(body.decode("utf-8"))
@@ -48,21 +58,31 @@ def sample_bytes(key: str, sha256: str) -> tuple[str, bytes] | None:
         return name, archive.read(name)
 
 
-def malware(key: str, per_family: int, options: ScanOptions) -> dict:
+def malware(key: str, per_family: int, options: ScanOptions, only: list | None = None) -> dict:
     results = collections.defaultdict(collections.Counter)
-    misses = []
-    for family in FAMILIES:
-        try:
-            listing = query(key, {"query": "get_siginfo", "signature": family, "limit": str(per_family)})
-        except Exception as exc:
-            print(f"{family}: lookup failed ({exc})")
-            continue
-        for item in (listing.get("data") or [])[:per_family]:
+    misses, failed = [], 0
+    if only:
+        batches = collections.defaultdict(list)
+        for item in only:
+            batches[item["family"]].append({"sha256_hash": item["sha256"], "file_type": item.get("type")})
+        families = sorted(batches.items())
+    else:
+        families = []
+        for family in FAMILIES:
+            try:
+                listing = query(key, {"query": "get_siginfo", "signature": family, "limit": str(per_family)})
+            except Exception as exc:
+                print(f"{family}: lookup failed ({exc})")
+                continue
+            families.append((family, (listing.get("data") or [])[:per_family]))
+    for family, items in families:
+        for item in items:
             sha256 = item.get("sha256_hash", "")
             try:
                 sample = sample_bytes(key, sha256)
             except Exception as exc:
                 print(f"  {sha256[:16]} download failed ({exc})")
+                failed += 1
                 continue
             if sample is None:
                 continue
@@ -74,7 +94,7 @@ def malware(key: str, per_family: int, options: ScanOptions) -> dict:
                 misses.append({"family": family, "sha256": sha256, "name": name, "type": item.get("file_type")})
             print(f"  {family:15} {report.verdict.value:10} {item.get('file_type', ''):6} {sha256[:16]}", flush=True)
             time.sleep(0.5)
-    return {"families": {f: dict(c) for f, c in results.items()}, "misses": misses}
+    return {"families": {f: dict(c) for f, c in results.items()}, "misses": misses, "failed": failed}
 
 
 def clean(folders: list, limit: int, options: ScanOptions) -> dict:
@@ -113,6 +133,9 @@ def summary(result: dict) -> str:
         caught = total["dangerous"] + total["suspicious"]
         all_samples = caught + total["clean"]
         if all_samples:
+            failed = result["malware"].get("failed", 0)
+            if failed:
+                lines += ["", f"{failed} sample(s) couldn't be downloaded and aren't counted."]
             lines += ["", f"Caught {caught} of {all_samples} ({caught * 100 / all_samples:.0f}%), "
                           f"{total['dangerous']} as Dangerous."]
     if "clean" in result:
@@ -127,6 +150,7 @@ def summary(result: dict) -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Measure Barry on real malware and clean software")
     parser.add_argument("--per-family", type=int, default=15)
+    parser.add_argument("--only", help="re-test the samples listed as misses in an earlier result file")
     parser.add_argument("--clean", nargs="*", default=[], help="folders of trusted programs to check")
     parser.add_argument("--clean-limit", type=int, default=400)
     parser.add_argument("--out", default="benchmark")
@@ -138,7 +162,8 @@ def main() -> None:
         from antiloggingbear import settings as config
         key = config.load().mb_api_key
     if key:
-        result["malware"] = malware(key, args.per_family, options)
+        only = json.loads(Path(args.only).read_text(encoding="utf-8"))["malware"]["misses"] if args.only else None
+        result["malware"] = malware(key, args.per_family, options, only)
     else:
         print("No MalwareBazaar key (MB_API_KEY or Barry's settings) - skipping the malware samples")
     if args.clean:
