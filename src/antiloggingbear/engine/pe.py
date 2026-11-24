@@ -172,9 +172,9 @@ def _installer_engine(data: bytes) -> str:
 def _chromium_runtime(data: bytes, strings: str) -> bool:
     if len(data) < 30 * 1024 * 1024:
         return False
-    markers = ("Chromium", "chrome_elf", "content_shell", "Electron", "CEF_VERSION", "libcef", "QtWebEngine",
-               "blink::", "v8::internal")
-    return sum(1 for marker in markers if marker in strings) >= 2
+    markers = (b"Chromium", b"chrome_elf", b"content_shell", b"Electron", b"CEF_VERSION", b"libcef",
+               b"QtWebEngine", b"blink::", b"v8::internal", b"third_party/blink", b"components/viz")
+    return sum(1 for marker in markers if marker in data) >= 2
 
 
 def overlay_start(data: bytes) -> int:
