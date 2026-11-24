@@ -52,6 +52,24 @@ def scan_path(path: str, options: ScanOptions | None = None,
     return Scanner(options or ScanOptions(), progress, cancelled).run(path)
 
 
+def scan_data(name: str, data: bytes, options: ScanOptions | None = None) -> ScanReport:
+    scanner = Scanner(options or ScanOptions(use_antivirus=False), None, lambda: False)
+    started = time.monotonic()
+    report = ScanReport(target=name, strict=scanner.options.strict)
+    if scanner.options.use_yara:
+        scanner._yara = shared_engine(scanner.options.custom_rules_dir, scanner.options.rules_dir)
+        report.engines["YARA"] = scanner._yara.status
+    report.extend(generic.check_name(name))
+    try:
+        scanner._scan_tree(Entry(path=name, data=data, depth=0), report, inspect_names=False)
+    except StopScan:
+        pass
+    finally:
+        report.extend(scanner._walker.findings)
+    report.duration = time.monotonic() - started
+    return report
+
+
 class Scanner:
     def __init__(self, options: ScanOptions, progress: Progress | None,
                  cancelled: Callable[[], bool]) -> None:

@@ -11,6 +11,8 @@ jobs:
       matrix:
         arch: [x64, x86]
     runs-on: windows-latest
+    env:
+      WINDOWS_SIGNING: ${{ secrets.AZURE_CLIENT_ID != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -31,6 +33,21 @@ jobs:
           if ($run.ExitCode -ne 0) { throw "BarryBear.exe exited with code $($run.ExitCode)" }
           if (-not (Get-ChildItem -Path dist/BarryBear -Recurse -Filter "libtkdnd*.dll")) { throw "drag-and-drop library missing" }
           if (-not (Get-ChildItem -Path dist/BarryBear -Recurse -Filter "7z.dll")) { throw "7-Zip missing" }
+      - name: Sign Barry's program
+        if: env.WINDOWS_SIGNING == 'true'
+        uses: Azure/artifact-signing-action@v2.0.0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.AZURE_SIGNING_PROFILE }}
+          files-folder: dist/BarryBear
+          files-folder-filter: BarryBear.exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
       - name: Portable zip
         shell: pwsh
         run: Compress-Archive -Path dist/BarryBear/* -DestinationPath dist/BarryBear-${{ matrix.arch }}-portable.zip
@@ -39,6 +56,21 @@ jobs:
         run: |
           $version = (Select-String -Path pyproject.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
           & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DAppVersion=$version" "/DArch=${{ matrix.arch }}" packaging/installer.iss
+      - name: Sign the installer
+        if: env.WINDOWS_SIGNING == 'true'
+        uses: Azure/artifact-signing-action@v2.0.0
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.AZURE_SIGNING_PROFILE }}
+          files-folder: dist
+          files-folder-filter: BarryBear-*-setup.exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
       - uses: actions/upload-artifact@v4
         with:
           name: windows-${{ matrix.arch }}
@@ -62,6 +94,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     env:
       MACOSX_DEPLOYMENT_TARGET: ${{ matrix.target }}
+      MAC_SIGNING: ${{ secrets.MAC_CERTIFICATE_P12 != '' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -84,12 +117,43 @@ jobs:
           echo hello > note.txt
           "dist/Barry Bear.app/Contents/MacOS/Barry Bear" note.txt --no-av
           find "dist/Barry Bear.app" -name 7zz -perm -u+x | grep -q 7zz
+      - name: Sign the app
+        if: env.MAC_SIGNING == 'true'
+        env:
+          CERTIFICATE: ${{ secrets.MAC_CERTIFICATE_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MAC_CERTIFICATE_PASSWORD }}
+          IDENTITY: ${{ secrets.MAC_SIGNING_IDENTITY }}
+        run: |
+          keychain="$RUNNER_TEMP/barry.keychain-db"
+          echo "$CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/barry.p12"
+          security create-keychain -p "" "$keychain"
+          security set-keychain-settings "$keychain"
+          security unlock-keychain -p "" "$keychain"
+          security import "$RUNNER_TEMP/barry.p12" -k "$keychain" -P "$CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" "$keychain"
+          security list-keychains -d user -s "$keychain" login.keychain
+          codesign --force --deep --timestamp --options runtime --entitlements packaging/entitlements.plist \
+            --sign "$IDENTITY" "dist/Barry Bear.app"
+          codesign --verify --deep --strict "dist/Barry Bear.app"
       - name: Disk image
         run: |
           mkdir -p dmg
           cp -R "dist/Barry Bear.app" dmg/
           ln -s /Applications dmg/Applications
           hdiutil create -volname "Barry Bear" -srcfolder dmg -ov -format UDZO "dist/BarryBear-macOS-${{ matrix.name }}.dmg"
+      - name: Notarise the disk image
+        if: env.MAC_SIGNING == 'true'
+        env:
+          IDENTITY: ${{ secrets.MAC_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          dmg="dist/BarryBear-macOS-${{ matrix.name }}.dmg"
+          codesign --force --timestamp --sign "$IDENTITY" "$dmg"
+          xcrun notarytool submit "$dmg" --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_APP_PASSWORD" --wait
+          xcrun stapler staple "$dmg"
       - uses: actions/upload-artifact@v4
         with:
           name: macos-${{ matrix.name }}
